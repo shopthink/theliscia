@@ -10,7 +10,7 @@ Stack: Next.js 16 + TypeScript, Supabase (PostgreSQL, Auth e Storage privado), h
 
 ---
 
-## Situação desta entrega (fases 0 e 1)
+## Situação desta entrega (fases 0, 1 e 2)
 
 ### Funcionando e testado
 
@@ -35,9 +35,22 @@ Stack: Next.js 16 + TypeScript, Supabase (PostgreSQL, Auth e Storage privado), h
 - 16 testes de banco num PostgreSQL 16 real com as migrações: RLS para visitante e conta não autorizada, janela 20/10 às 23h59 aceita e 21/10 bloqueia, preço vindo só do banco, mudança de preço não altera pedido iniciado, comprovante não aprova, prazo do comprovante, **aprovação em paralelo cria um único pedido**, recusa idempotente, transação Pix duplicada, pedido manual, versão de receita, storage privado e limite de tentativas.
 - Fluxo completo no navegador (desktop e celular) contra PostgREST real: criar campanha, tentar ativar sem produto, ativar, fazer pedido abaixo do mínimo e depois válido, enviar arquivo falso e depois verdadeiro, visitante tentando abrir o comprovante (negado), aprovar em duas abas ao mesmo tempo (um único pedido), registrar saldo, pedido manual. Login e storage foram simulados nesse teste; o banco e a API eram reais.
 
+
+### Fase 2: compras e estoque
+
+| Área | O que faz |
+|---|---|
+| Compras | Fornecedor existente ou novo na hora, data, canal, vários itens com pacotes × conteúdo (g, kg, ml, L, un) convertidos para a unidade do estoque. |
+| Rateio | Frete, serviço, outras despesas e desconto divididos proporcionalmente em centavos (maior resto), dentro do banco. Soma dos itens = total, sempre. |
+| Tempo de compra | Minutos × valor da hora copiado no momento do registro; conta uma vez por compra, fora do estoque. |
+| Estoque | Livro de movimentos imutável (compra, ajuste, perda, estorno) e saldo com **custo médio móvel**. Editar uma compra estorna a entrada antiga e lança a nova; excluir estorna e mantém no histórico. |
+| Foto do cupom | Leitura com Tesseract (português) no navegador, gera rascunho: fornecedor, data, itens, pacotes, embalagem, valores e total. Sugere o insumo pelo nome. Campos não reconhecidos ficam destacados; nada é inventado. A foto não é guardada, só o texto lido. |
+| Lista de compras | Necessidade dos pedidos confirmados não produzidos (receita gravada em cada pedido + sêmola, sacos, etiquetas, molho e sacolas das configurações) menos o estoque. |
+
+Precisão da leitura do cupom: testada com uma imagem limpa (100% dos itens). Foto real de cupom térmico varia com luz, ângulo e papel; por isso é sempre um rascunho revisável.
+
 ### Ainda não existe (próximas fases)
 
-- **Fase 2, Compras e estoque**: fornecedores, compra com vários itens, leitura do cupom, rateio de frete, movimentos de estoque, lista de compras. As funções de rateio e conversão de embalagens já estão prontas e testadas em `lib/rateio.ts`.
 - **Fase 3, Produção**: lotes por receita, apontamento de horas ativas, perdas, consumo real.
 - **Fase 4, Resultado**: CMV, custo médio móvel, fechamento mensal com trava e reabertura, exportação.
 - Confirmação automática de Pix (precisa de um provedor com webhook) e WhatsApp automático: fora do escopo inicial, como pedido.

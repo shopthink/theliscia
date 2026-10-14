@@ -121,7 +121,7 @@ th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spa
 td { padding: 0.6rem; border-bottom: 1px solid var(--creme-2); vertical-align: top; }
 tr:last-child td { border-bottom: 0; }
 td.dir, th.dir { text-align: right; }
-td.num { white-space: nowrap; }
+td.num, .linha-total .num { white-space: nowrap; }
 tr.clicavel:hover td { background: rgba(41,57,47,0.04); }
 .vazio { text-align: center; padding: 2rem 1rem; color: var(--suave); }
 .linha-total { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; }
