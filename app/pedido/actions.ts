@@ -12,7 +12,7 @@ export interface EstadoPedido { erro?: string }
 async function origemAnonima() {
   const h = await headers();
   const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "desconhecido";
-  return createHash("sha256").update(`${process.env.HASH_SALT ?? "liscia"}:${ip}`).digest("hex").slice(0, 32);
+  return createHash("sha256").update(`${process.env.HASH_SALT ?? process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "liscia"}:${ip}`).digest("hex").slice(0, 32);
 }
 
 /** O navegador manda só produto e quantidade. Preços e totais são calculados no banco. */

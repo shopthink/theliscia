@@ -96,6 +96,8 @@ git push -u origin main
 | `HASH_SALT` | um texto aleatório longo (ex.: gere com `openssl rand -hex 32`) |
 | `NEXT_PUBLIC_SITE_URL` | o endereço final, ex.: `https://the-liscia.vercel.app` |
 
+Se você usar a **integração Supabase da Vercel**, ela cria as chaves sozinha com outros nomes (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` etc.), e o código aceita esses nomes. `HASH_SALT` e `NEXT_PUBLIC_SITE_URL` são opcionais: sem eles, o sistema usa a chave secreta como base do hash e o domínio de produção da Vercel como endereço.
+
 3. Deploy. Depois, se usar domínio próprio, atualize `NEXT_PUBLIC_SITE_URL` e faça novo deploy.
 4. No Supabase, em **Authentication → URL Configuration**, coloque o mesmo endereço em "Site URL".
 
