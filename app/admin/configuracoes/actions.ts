@@ -30,12 +30,14 @@ export async function salvarConfiguracoes(_: EstadoForm, d: FormData): Promise<E
     geladeira_min: Math.round(num(d, "geladeira_h") * 60),
     freezer_min: Math.round(num(d, "freezer_h") * 60),
     esfriar_min: num(d, "esfriar_min"),
+    dias_sumido: Math.round(num(d, "dias_sumido")),
     rotulo_fabricante: String(d.get("rotulo_fabricante") ?? "").trim() || null,
     rotulo_documento: String(d.get("rotulo_documento") ?? "").trim() || null,
     rotulo_endereco: String(d.get("rotulo_endereco") ?? "").trim() || null,
     rotulo_contato: String(d.get("rotulo_contato") ?? "").trim() || null,
   };
   if (Object.values(linha).some((v) => typeof v === "number" && Number.isNaN(v))) return { erro: "Use apenas números positivos." };
+  if (linha.dias_sumido < 7 || linha.dias_sumido > 365) return { erro: "Dias para “sumido”: entre 7 e 365." };
   if (linha.taxa_percentual > 100) return { erro: "A taxa deve ficar entre 0 e 100%." };
   const { data, error } = await supabase.from("configuracoes").update(linha).eq("id", true).eq("versao", Number(d.get("versao"))).select("id");
   if (error) return { erro: mensagemDoBanco(error) };

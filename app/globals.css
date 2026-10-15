@@ -199,6 +199,10 @@ tr.clicavel:hover td { background: rgba(41,57,47,0.04); }
 .opcao-receber input { margin-top: 0.25rem; }
 .opcao-receber small { display: block; color: var(--suave); }
 .grupo-entrega { margin-bottom: 1.25rem; }
+.etiqueta-crm { display: inline-block; background: var(--creme-2); border-radius: 6px; padding: 0 0.4rem; margin: 2px 4px 0 0; }
+.filtros-clientes { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: flex-end; }
+.filtros-clientes .campo { margin: 0; flex: 1 1 180px; }
+.filtros-clientes .check { margin-bottom: 0.6rem; }
 .grupo-entrega h3 { margin: 0 0 0.2rem; }
 @media print {
   .romaneio .cartao { box-shadow: none; break-inside: avoid; }

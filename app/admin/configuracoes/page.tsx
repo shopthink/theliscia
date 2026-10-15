@@ -22,6 +22,7 @@ export default async function Configuracoes() {
             <div className="campo"><label htmlFor="whatsapp_contato">WhatsApp</label><input id="whatsapp_contato" name="whatsapp_contato" type="tel" defaultValue={c.whatsapp_contato ?? ""} /></div>
             <div className="campo"><label htmlFor="instagram">Instagram</label><input id="instagram" name="instagram" defaultValue={c.instagram ?? ""} placeholder="@theliscia" /></div>
             <div className="campo"><label htmlFor="email_contato">E-mail</label><input id="email_contato" name="email_contato" type="email" defaultValue={c.email_contato ?? ""} /></div>
+            <div className="campo"><label htmlFor="dias_sumido">Cliente vira “sumido” após (dias sem pedir)</label><input id="dias_sumido" name="dias_sumido" inputMode="numeric" defaultValue={c.dias_sumido} /></div>
           </div>
           <h2>Custos</h2>
           <div className="grade">

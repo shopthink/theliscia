@@ -131,6 +131,10 @@ export function FormPedido({ campanha: c, condominios, fixo }: { campanha: Campa
           <div className="aviso info" style={{ whiteSpace: "pre-line" }}><strong>Retirada:</strong> {c.retirada_info}</div>
         )}
         {c.frete_info && <div className="aviso info"><strong>Entrega:</strong> {c.frete_info}</div>}
+        <label className="check" style={{ marginBottom: "1rem", alignItems: "flex-start" }}>
+          <input type="checkbox" name="aceita_novidades" style={{ marginTop: "0.3rem" }} />
+          <span>Quero receber pelo WhatsApp os avisos de novas rodadas e novidades da The Liscia. <small className="suave">Dá para sair quando quiser.</small></span>
+        </label>
         <div className="campo">
           <label htmlFor="observacoes">Observações (opcional)</label>
           <textarea id="observacoes" name="observacoes" maxLength={500} />

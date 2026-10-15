@@ -53,6 +53,10 @@ export async function enviarPedido(_: EstadoPedido, d: FormData): Promise<Estado
     return { erro: error.code === "P0001" ? error.message : "Não foi possível registrar o pedido agora. Tente de novo em instantes." };
   }
   const linha = Array.isArray(data) ? data[0] : data;
+  if (d.get("aceita_novidades") === "on") {
+    // Não bloqueia o pedido se falhar
+    await sb.rpc("registrar_aceite_novidades", { p_telefone: telefone, p_origem: "pedido" }).then(() => {}, () => {});
+  }
   redirect(`/pedido/${linha.token}`);
 }
 

@@ -48,7 +48,7 @@ export default async function Pedido({ params, searchParams }: { params: Promise
         <div>
           <div className="cartao">
             <h2>Cliente e entrega</h2>
-            <p style={{ margin: 0 }}><strong>{p.cliente_nome}</strong></p>
+            <p style={{ margin: 0 }}><Link href={`/admin/clientes/${p.cliente_id}`}><strong>{p.cliente_nome}</strong></Link> <Link href={`/admin/clientes/${p.cliente_id}`} className="suave" style={{ fontSize: "0.85rem" }}>· ver ficha</Link></p>
             <p><a href={linkWhatsApp(p.cliente_telefone)} target="_blank" rel="noopener">{formatarTelefone(p.cliente_telefone)} (WhatsApp)</a></p>
             <p style={{ marginBottom: 0 }}>
               {p.modalidade === "entrega" ? "Entrega" : "Retirada"} em <strong>{formatarData(p.entrega_em)}</strong>
