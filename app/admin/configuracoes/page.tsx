@@ -41,8 +41,17 @@ export default async function Configuracoes() {
             <div className="campo"><label htmlFor="semola_g_por_base">Sêmola por base (g)</label><input id="semola_g_por_base" name="semola_g_por_base" inputMode="decimal" defaultValue={n(c.semola_g_por_base)} /><span className="ajuda">7 g é estimativa não medida.</span></div>
             <div className="campo"><label htmlFor="saco_vacuo_por_base">Sacos a vácuo por base</label><input id="saco_vacuo_por_base" name="saco_vacuo_por_base" inputMode="decimal" defaultValue={n(c.saco_vacuo_por_base)} /></div>
             <div className="campo"><label htmlFor="etiqueta_por_base">Etiquetas por base</label><input id="etiqueta_por_base" name="etiqueta_por_base" inputMode="decimal" defaultValue={n(c.etiqueta_por_base)} /></div>
-            <div className="campo"><label htmlFor="molho_ml_por_base">Molho de marcação por base (ml)</label><input id="molho_ml_por_base" name="molho_ml_por_base" inputMode="decimal" defaultValue={n(c.molho_ml_por_base)} /><span className="ajuda">0 = sem molho.</span></div>
+            <div className="campo"><label htmlFor="molho_g_por_base">Molho de marcação por base (g)</label><input id="molho_g_por_base" name="molho_g_por_base" inputMode="decimal" defaultValue={n(c.molho_g_por_base)} /><span className="ajuda">0 = sem molho.</span></div>
             <div className="campo"><label htmlFor="sacola_por_pedido">Sacolas kraft por pedido</label><input id="sacola_por_pedido" name="sacola_por_pedido" inputMode="decimal" defaultValue={n(c.sacola_por_pedido)} /></div>
+          </div>
+          <h2>Tempos de referência da produção</h2>
+          <p className="suave">Usados nas contagens regressivas das esperas. Não contam como trabalho.</p>
+          <div className="grade">
+            <div className="campo"><label htmlFor="descanso_min">Descanso da massa (min)</label><input id="descanso_min" name="descanso_min" inputMode="numeric" defaultValue={c.descanso_min} /></div>
+            <div className="campo"><label htmlFor="dobra_min">Aviso de dobra após (min)</label><input id="dobra_min" name="dobra_min" inputMode="numeric" defaultValue={c.dobra_min} /><span className="ajuda">0 = sem aviso.</span></div>
+            <div className="campo"><label htmlFor="geladeira_h">Geladeira (horas)</label><input id="geladeira_h" name="geladeira_h" inputMode="decimal" defaultValue={n(c.geladeira_min / 60)} /></div>
+            <div className="campo"><label htmlFor="esfriar_min">Esfriar depois de assar (min)</label><input id="esfriar_min" name="esfriar_min" inputMode="numeric" defaultValue={c.esfriar_min} /></div>
+            <div className="campo"><label htmlFor="freezer_h">Freezer para firmar (horas)</label><input id="freezer_h" name="freezer_h" inputMode="decimal" defaultValue={n(c.freezer_min / 60)} /></div>
           </div>
         </FormAcao>
       </div>

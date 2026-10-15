@@ -7,7 +7,7 @@ const ITENS: { href: string; rotulo: string; grupo?: string; emBreve?: boolean }
   { href: "/admin/pedidos", rotulo: "Pedidos", grupo: "Vendas" },
   { href: "/admin/campanhas", rotulo: "Campanhas" },
   { href: "/admin/compras", rotulo: "Compras e estoque", grupo: "Operação" },
-  { href: "/admin/producao", rotulo: "Produção", emBreve: true },
+  { href: "/admin/producao", rotulo: "Produção" },
   { href: "/admin/receitas", rotulo: "Receitas" },
   { href: "/admin/insumos", rotulo: "Insumos" },
   { href: "/admin/fechamento", rotulo: "Fechamento", grupo: "Resultado", emBreve: true },

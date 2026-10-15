@@ -206,3 +206,18 @@ tr.clicavel:hover td { background: rgba(41,57,47,0.04); }
 
 .oculto-impressao { }
 @media print { .lateral, .oculto-impressao { display: none !important; } .painel { display: block; } }
+
+/* ---------- Produção (cronômetro na cozinha) ---------- */
+.cronometro .rodando { background: var(--verde); color: var(--creme); border-radius: 12px; padding: 1.2rem; text-align: center; margin: -0.2rem -0.2rem 0; }
+.cronometro .etapa-atual { font-size: 1.8rem; font-weight: 600; margin-top: 0.2rem; }
+.cronometro .tempo { font-size: 3.4rem; font-weight: 600; line-height: 1.1; margin: 0.3rem 0 0.9rem; letter-spacing: 0.02em; }
+.cronometro .trocar { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; align-items: center; margin-top: 1rem; font-size: 0.85rem; }
+.cronometro .trocar button { background: transparent; color: var(--creme); border-color: rgba(241,231,207,0.5); }
+.cronometro .trocar button:hover { background: rgba(241,231,207,0.12); }
+.botao-grande { min-height: 64px; font-size: 1.1rem; border-radius: 16px; width: 100%; }
+.botao-grande.pausar { background: var(--bordo); border-color: var(--bordo); color: var(--creme); max-width: 320px; }
+.botao-grande.pausar:hover { background: var(--bordo-2); }
+.grade-etapas { display: grid; gap: 0.6rem; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.espera-ativa { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; background: var(--creme); border: 1.5px dashed var(--linha); border-radius: 12px; padding: 0.9rem; margin-bottom: 0.9rem; }
+details > summary { list-style: revert; }
+@media (max-width: 860px) { .cronometro .tempo { font-size: 2.8rem; } .grade-etapas { grid-template-columns: 1fr 1fr; } }

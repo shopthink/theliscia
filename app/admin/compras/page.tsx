@@ -211,7 +211,7 @@ async function ListaDeCompras() {
     supabase.from("pedidos")
       .select("id, pedido_itens(quantidade, receita_versoes(peso_bolinha_g, massa_base_g, receita_versao_ingredientes(insumo_id, quantidade)))")
       .in("status_producao", ["confirmado", "em_producao"]),
-    supabase.from("configuracoes").select("semola_g_por_base, saco_vacuo_por_base, etiqueta_por_base, molho_ml_por_base, sacola_por_pedido").single(),
+    supabase.from("configuracoes").select("semola_g_por_base, saco_vacuo_por_base, etiqueta_por_base, molho_g_por_base, sacola_por_pedido").single(),
     supabase.from("insumos").select("id, nome, unidade, uso_auxiliar, entra_lista_compras, ativo").order("nome"),
     supabase.from("estoque_saldos").select("insumo_id, quantidade, valor_centavos"),
     supabase.from("insumo_embalagens").select("id, insumo_id, nome, quantidade_base").eq("ativo", true),

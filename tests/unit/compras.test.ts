@@ -60,7 +60,7 @@ describe("lista de compras", () => {
     { id: "k", nome: "Sacola", unidade: "un", uso_auxiliar: "sacola", entra_lista_compras: true, ativo: true },
   ];
   const item = { quantidade: 10, peso_bolinha_g: 180, massa_base_g: 857, ingredientes: [{ insumo_id: "f", quantidade: 500 }, { insumo_id: "a", quantidade: 165 }] };
-  const aux = { semola_g_por_base: 7, saco_vacuo_por_base: 1, etiqueta_por_base: 1, molho_ml_por_base: 0, sacola_por_pedido: 1 };
+  const aux = { semola_g_por_base: 7, saco_vacuo_por_base: 1, etiqueta_por_base: 1, molho_g_por_base: 0, sacola_por_pedido: 1 };
 
   it("calcula necessidade, desconta estoque e ignora água", () => {
     const { linhas, bases } = montarLista([{ itens: [item] }, { itens: [{ ...item, quantidade: 2 }] }], aux, insumos, { f: 1000, v: 50 });

@@ -49,3 +49,26 @@ export function validarDatasCampanha(abre: string, fecha: string, entrega: strin
   if (entrega < fecha) return "A entrega não pode ser antes do encerramento dos pedidos.";
   return null;
 }
+
+/** "2026-10-14T10:30" digitado no painel = horário de São Paulo (UTC−3, sem horário de verão desde 2019). */
+export function localSPparaISO(v: string | null | undefined): string | null {
+  if (!v || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) return null;
+  return new Date(`${v}:00-03:00`).toISOString();
+}
+
+/** ISO → "2026-10-14T10:30" no horário de São Paulo, para inputs datetime-local. */
+export function isoParaLocalSP(iso: string | Date): string {
+  return new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(0, 16);
+}
+
+export function formatarHora(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: FUSO, hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+}
+
+/** 125 → "2 h 05 min"; 45 → "45 min" */
+export function formatarMinutos(min: number): string {
+  const m = Math.round(min);
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+}

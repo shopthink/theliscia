@@ -6,8 +6,8 @@ import { salvarNovaVersao } from "../actions";
 
 interface Ing { insumo_id: string; quantidade: number; densidade_g: number }
 
-export function EditorReceita({ receitaId, insumos, iniciais, peso }: {
-  receitaId: string; insumos: { id: string; nome: string; unidade: string }[]; iniciais: Ing[]; peso: number;
+export function EditorReceita({ receitaId, tipo, unidadeProduto, insumos, iniciais, peso, rendimento }: {
+  receitaId: string; tipo: string; unidadeProduto?: string; insumos: { id: string; nome: string; unidade: string }[]; iniciais: Ing[]; peso: number; rendimento?: number;
 }) {
   const [linhas, setLinhas] = useState<Ing[]>(iniciais.length ? iniciais.map(({ insumo_id, quantidade, densidade_g }) => ({ insumo_id, quantidade, densidade_g })) : [{ insumo_id: "", quantidade: 0, densidade_g: 1 }]);
   const [estado, enviar] = useActionState(salvarNovaVersao, {});
@@ -18,6 +18,7 @@ export function EditorReceita({ receitaId, insumos, iniciais, peso }: {
   return (
     <form action={enviar}>
       <input type="hidden" name="receita_id" value={receitaId} />
+      <input type="hidden" name="tipo" value={tipo} />
       <input type="hidden" name="ingredientes" value={JSON.stringify(validas)} />
       {estado.erro && <div className="aviso erro">{estado.erro}</div>}
       {estado.ok && <div className="aviso ok">{estado.ok}</div>}
@@ -47,7 +48,11 @@ export function EditorReceita({ receitaId, insumos, iniciais, peso }: {
       </div>
       <p className="suave" style={{ fontSize: "0.85rem" }}>“g por unidade” serve para estimar a massa: 1 para g, água e cerveja; 0,91 para azeite. Ajuste se aferir.</p>
       <div className="grade">
-        <div className="campo"><label htmlFor="peso">Peso da bolinha (g)</label><input id="peso" name="peso_bolinha_g" type="number" step="0.1" defaultValue={peso} required /></div>
+        {tipo === "preparo" ? (
+          <div className="campo"><label htmlFor="rend">Esta receita rende ({unidadeProduto})</label><input id="rend" name="rendimento" type="number" step="0.1" defaultValue={rendimento} required /><span className="ajuda">Ex.: 1 kg de tomate rende 800 g de molho.</span></div>
+        ) : (
+          <div className="campo"><label htmlFor="peso">Peso da bolinha (g)</label><input id="peso" name="peso_bolinha_g" type="number" step="0.1" defaultValue={peso} required /></div>
+        )}
         <div className="campo"><label htmlFor="obs">O que mudou?</label><input id="obs" name="observacoes" placeholder="Ex.: hidratação ajustada" /></div>
       </div>
       <Enviar />

@@ -23,8 +23,13 @@ export async function salvarConfiguracoes(_: EstadoForm, d: FormData): Promise<E
     semola_g_por_base: num(d, "semola_g_por_base"),
     saco_vacuo_por_base: num(d, "saco_vacuo_por_base"),
     etiqueta_por_base: num(d, "etiqueta_por_base"),
-    molho_ml_por_base: num(d, "molho_ml_por_base"),
+    molho_g_por_base: num(d, "molho_g_por_base"),
     sacola_por_pedido: num(d, "sacola_por_pedido"),
+    descanso_min: num(d, "descanso_min"),
+    dobra_min: num(d, "dobra_min"),
+    geladeira_min: Math.round(num(d, "geladeira_h") * 60),
+    freezer_min: Math.round(num(d, "freezer_h") * 60),
+    esfriar_min: num(d, "esfriar_min"),
   };
   if (Object.values(linha).some((v) => typeof v === "number" && Number.isNaN(v))) return { erro: "Use apenas números positivos." };
   if (linha.taxa_percentual > 100) return { erro: "A taxa deve ficar entre 0 e 100%." };

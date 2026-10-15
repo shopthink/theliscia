@@ -3,6 +3,9 @@ import { exigirAdmin } from "@/lib/auth";
 import { formatarBRL } from "@/lib/dinheiro";
 import { campanhaAberta, formatarData, hojeSP } from "@/lib/datas";
 import { SeloPagamento, SeloProducao } from "@/components/Selos";
+import { codigoLote, ETAPAS_TRABALHO } from "@/lib/producao";
+import { formatarMinutos } from "@/lib/datas";
+import { Relogio } from "./producao/Relogio";
 
 export const metadata = { title: "Início" };
 
@@ -18,14 +21,18 @@ export default async function Inicio() {
   const mesIni = `${hoje.slice(0, 7)}-01`;
   const proxMes = somarDias(`${hoje.slice(0, 7)}-28`, 5).slice(0, 7) + "-01";
 
-  const [{ count: pendentes }, { data: abertos }, { data: entreguesMes }, { data: campanha }] = await Promise.all([
+  const [{ count: pendentes }, { data: abertos }, { data: entreguesMes }, { data: campanha }, { data: aberta }, { data: sessoesMes }, { count: lotesAbertos }] = await Promise.all([
     supabase.from("solicitacoes").select("id", { count: "exact", head: true }).eq("status", "em_conferencia"),
     supabase.from("pedidos").select("id, numero, cliente_nome, entrega_em, total_centavos, recebido_centavos, status_pagamento, status_producao, pedido_itens(nome, quantidade)")
       .not("status_producao", "in", "(entregue,cancelado)").order("entrega_em").limit(200),
     supabase.from("pedidos").select("total_centavos, recebido_centavos, pedido_itens(quantidade)")
       .eq("status_producao", "entregue").gte("entrega_em", mesIni).lt("entrega_em", proxMes),
     supabase.from("campanhas").select("id, nome, ativa, abre_em, fecha_em, entrega_em").eq("ativa", true).maybeSingle(),
+    supabase.from("lote_sessoes").select("etapa, inicio, lote_id, lotes(numero)").is("fim", null).maybeSingle(),
+    supabase.from("lote_sessoes").select("inicio, fim").gte("inicio", `${mesIni}T03:00:00Z`).lt("inicio", `${proxMes}T03:00:00Z`).not("fim", "is", null),
+    supabase.from("lotes").select("id", { count: "exact", head: true }).in("status", ["planejado", "em_producao"]),
   ]);
+  const minutosMes = (sessoesMes ?? []).reduce((t, x) => t + (Date.parse(x.fim!) - Date.parse(x.inicio)) / 60000, 0);
 
   const vendasMes = (entreguesMes ?? []).reduce((s, p) => s + p.total_centavos, 0);
   const basesMes = (entreguesMes ?? []).reduce((s, p: any) => s + p.pedido_itens.reduce((a: number, i: any) => a + i.quantidade, 0), 0);
@@ -48,6 +55,13 @@ export default async function Inicio() {
         </div>
       )}
 
+      {aberta && (
+        <Link href={`/admin/producao/${aberta.lote_id}`} className="aviso alerta acoes" style={{ justifyContent: "space-between", textDecoration: "none" }}>
+          <span><strong>▶ {ETAPAS_TRABALHO[aberta.etapa]}</strong> no lote {codigoLote((aberta as any).lotes.numero)}</span>
+          <strong className="num"><Relogio desde={aberta.inicio} /></strong>
+        </Link>
+      )}
+
       <div className="cartoes">
         <div className="cartao">
           <div className="caixa-alta suave">Vendas entregues em {nomeMes}</div>
@@ -64,6 +78,11 @@ export default async function Inicio() {
           {aProduzir.size === 0 ? <div className="suave">Nada pendente.</div> : [...aProduzir].map(([n, q]) => (
             <div key={n} className="linha-total"><span>{n}</span><strong className="num">{q}</strong></div>
           ))}
+        </div>
+        <div className="cartao">
+          <div className="caixa-alta suave">Produção em {nomeMes}</div>
+          <div className="indicador num">{formatarMinutos(minutosMes)}</div>
+          <small>de trabalho ativo · <Link href="/admin/producao">{lotesAbertos ?? 0} {lotesAbertos === 1 ? "lote aberto" : "lotes abertos"}</Link></small>
         </div>
         <div className="cartao">
           <div className="caixa-alta suave">Campanha</div>
@@ -103,7 +122,7 @@ export default async function Inicio() {
         )}
       </div>
       <p className="suave" style={{ fontSize: "0.88rem" }}>
-        Resultado com custos, horas trabalhadas e fechamento mensal entram com as fases de compras, produção e fechamento.
+        Resultado do mês com CMV e fechamento entra na fase 4.
       </p>
     </>
   );

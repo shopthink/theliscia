@@ -77,7 +77,7 @@ export default async function Pedido({ params, searchParams }: { params: Promise
                 <select id="status" name="status" defaultValue={p.status_producao}>
                   {Object.entries(ROTULO_PRODUCAO).map(([v, r]) => <option key={v} value={v}>{r as string}</option>)}
                 </select>
-                <span className="ajuda">A venda é reconhecida no mês da entrega. Lotes de produção chegam na fase 3.</span>
+                <span className="ajuda">A venda é reconhecida no mês da entrega. Em produção e Pronto mudam sozinhos pelos lotes.</span>
               </div>
             </FormAcao>
           </div>

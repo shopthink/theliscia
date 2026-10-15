@@ -18,7 +18,7 @@ export interface ConsumoAuxiliar {
   semola_g_por_base: number;
   saco_vacuo_por_base: number;
   etiqueta_por_base: number;
-  molho_ml_por_base: number;
+  molho_g_por_base: number;
   sacola_por_pedido: number;
 }
 
@@ -59,7 +59,7 @@ export function calcularNecessidade(pedidos: PedidoParaProducao[], aux: ConsumoA
   somar(porUso("semola"), bases * aux.semola_g_por_base);
   somar(porUso("saco_vacuo"), bases * aux.saco_vacuo_por_base);
   somar(porUso("etiqueta"), bases * aux.etiqueta_por_base);
-  somar(porUso("molho"), bases * aux.molho_ml_por_base);
+  somar(porUso("molho"), bases * aux.molho_g_por_base);
   return { necessidade: nec, bases };
 }
 
