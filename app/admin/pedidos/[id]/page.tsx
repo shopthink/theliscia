@@ -6,6 +6,7 @@ import { ROTULO_PRODUCAO, SeloPagamento, SeloProducao } from "@/components/Selos
 import { formatarBRL } from "@/lib/dinheiro";
 import { formatarData, formatarDataHora } from "@/lib/datas";
 import { formatarTelefone, linkWhatsApp } from "@/lib/telefone";
+import { localEntrega } from "@/lib/condominios";
 import { mudarStatusProducao, registrarPagamento, removerPagamento } from "../actions";
 
 export const metadata = { title: "Pedido" };
@@ -51,6 +52,7 @@ export default async function Pedido({ params, searchParams }: { params: Promise
             <p><a href={linkWhatsApp(p.cliente_telefone)} target="_blank" rel="noopener">{formatarTelefone(p.cliente_telefone)} (WhatsApp)</a></p>
             <p style={{ marginBottom: 0 }}>
               {p.modalidade === "entrega" ? "Entrega" : "Retirada"} em <strong>{formatarData(p.entrega_em)}</strong>
+              {p.condominio_nome && <><br /><strong>{localEntrega(p)}</strong></>}
               {p.endereco && <><br />{p.endereco}</>}
             </p>
             {p.observacoes && <p className="suave" style={{ marginTop: "0.5rem" }}>Obs.: {p.observacoes}</p>}
@@ -68,6 +70,7 @@ export default async function Pedido({ params, searchParams }: { params: Promise
                 <span className="num">{formatarBRL(i.subtotal_centavos)}</span>
               </div>
             ))}
+            {p.taxa_entrega_centavos > 0 && <div className="linha-total"><span>Taxa de entrega</span><span className="num">{formatarBRL(p.taxa_entrega_centavos)}</span></div>}
             <div className="linha-total forte"><span>Total</span><span className="num">{formatarBRL(p.total_centavos)}</span></div>
           </div>
           <div className="cartao">

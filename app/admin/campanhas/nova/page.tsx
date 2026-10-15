@@ -10,7 +10,7 @@ export default async function NovaCampanha() {
   const { supabase } = await exigirAdmin();
   const { data: anterior } = await supabase
     .from("campanhas")
-    .select("id, nome, permite_entrega, permite_retirada, instrucoes_entrega, regiao_atendida, retirada_info, frete_info, pedido_minimo, pix_chave, pix_favorecido, pix_cidade, percentual_sinal, horas_envio_comprovante")
+    .select("id, nome, permite_entrega, permite_retirada, permite_condominios, taxa_entrega_centavos, instrucoes_entrega, regiao_atendida, retirada_info, frete_info, pedido_minimo, pix_chave, pix_favorecido, pix_cidade, percentual_sinal, horas_envio_comprovante")
     .order("criado_em", { ascending: false })
     .limit(1)
     .maybeSingle();

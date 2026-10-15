@@ -57,6 +57,7 @@ export async function mudarStatusProducao(_: EstadoForm, d: FormData): Promise<E
   if (error) return { erro: mensagemDoBanco(error) };
   if (!data?.length) return { erro: CONFLITO };
   revalidatePath(`/admin/pedidos/${id}`);
+  revalidatePath("/admin/pedidos");
   return { ok: "Status atualizado." };
 }
 
@@ -103,12 +104,17 @@ export async function criarPedidoManual(_: EstadoForm, d: FormData): Promise<Est
   }
   itens = itens.filter((i) => i.receita_id && i.quantidade > 0);
   if (!itens.length) return { erro: "Adicione ao menos um item." };
+  if (String(d.get("modalidade") ?? "") === "condominio" && !d.get("condominio_id")) return { erro: "Escolha o condomínio." };
   const valorPago = lerBRL(String(d.get("valor_pago") ?? "")) ?? 0;
   const { data, error } = await supabase.rpc("criar_pedido_manual", {
     p_nome: String(d.get("nome") ?? ""),
     p_telefone: String(d.get("telefone") ?? ""),
-    p_modalidade: String(d.get("modalidade") ?? ""),
+    p_modalidade: String(d.get("modalidade") ?? "") === "condominio" ? "entrega" : String(d.get("modalidade") ?? ""),
     p_endereco: String(d.get("endereco") ?? ""),
+    p_condominio_id: String(d.get("modalidade") ?? "") === "condominio" ? String(d.get("condominio_id") ?? "") || null : null,
+    p_bloco: String(d.get("bloco") ?? ""),
+    p_apto: String(d.get("apto") ?? ""),
+    p_taxa_entrega_centavos: String(d.get("modalidade") ?? "") === "entrega" ? lerBRL(String(d.get("taxa_entrega") ?? "")) ?? 0 : 0,
     p_entrega_em: String(d.get("entrega_em") ?? "") || null,
     p_observacoes: String(d.get("observacoes") ?? ""),
     p_itens: itens,

@@ -3,6 +3,7 @@ import { exigirAdmin } from "@/lib/auth";
 import { formatarData } from "@/lib/datas";
 import { codigoLote } from "@/lib/producao";
 import { BotaoImprimir } from "@/components/BotaoImprimir";
+import { localEntrega } from "@/lib/condominios";
 import { NUTRIENTES, alertasFrontais, formatarValor, percentualVD, porcao, type Tabela } from "@/lib/nutricao";
 
 export const metadata = { title: "Etiquetas" };
@@ -16,11 +17,17 @@ interface ReceitaRotulo {
 interface Etiqueta {
   receita: ReceitaRotulo;
   lote: { numero: number; produzido_em: string | null; assado_em: string | null } | null;
-  pedido: { numero: number; cliente: string } | null;
+  pedido: { numero: number; cliente: string; local: string | null } | null;
   indice: number; total: number;
 }
 
 const CAMPOS_RECEITA = "id, nome, rotulo_nome, rotulo_ingredientes, rotulo_alergenicos, rotulo_conservacao, rotulo_preparo, validade_dias, peso_assado_g, porcao_g, porcao_medida, nutricao";
+
+/** Na etiqueta só vai condomínio e unidade (endereço completo fica fora por privacidade). */
+function localCurto(p: { modalidade: string; condominio_nome?: string | null; bloco?: string | null; apto?: string | null }) {
+  if (p.condominio_nome) return localEntrega(p);
+  return p.modalidade === "retirada" ? "Retirada" : null;
+}
 
 function somarDias(iso: string, dias: number) {
   const d = new Date(`${iso}T12:00:00Z`);
@@ -39,7 +46,7 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
 
   if (sp.lote) {
     const { data: l } = await supabase.from("lotes")
-      .select(`id, numero, tipo, status, produzido_em, assado_em, bases_pedidos, bases_extras, unidades_boas, receitas(${CAMPOS_RECEITA}), pedido_itens(quantidade, pedidos(numero, cliente_nome))`)
+      .select(`id, numero, tipo, status, produzido_em, assado_em, bases_pedidos, bases_extras, unidades_boas, receitas(${CAMPOS_RECEITA}), pedido_itens(quantidade, pedidos(numero, cliente_nome, modalidade, condominio_nome, bloco, apto))`)
       .eq("id", sp.lote).maybeSingle();
     if (l && l.tipo === "base") {
       titulo = `Lote ${codigoLote(l.numero)}`;
@@ -48,14 +55,14 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
       const lote = { numero: l.numero, produzido_em: l.produzido_em, assado_em: l.assado_em };
       const itens = ((l.pedido_itens as any[]) ?? []).sort((a, b) => a.pedidos.numero - b.pedidos.numero);
       for (const it of itens) for (let k = 1; k <= it.quantidade; k++)
-        etiquetas.push({ receita, lote, pedido: { numero: it.pedidos.numero, cliente: it.pedidos.cliente_nome }, indice: k, total: it.quantidade });
+        etiquetas.push({ receita, lote, pedido: { numero: it.pedidos.numero, cliente: it.pedidos.cliente_nome, local: localCurto(it.pedidos) }, indice: k, total: it.quantidade });
       const totalLote = l.status === "concluido" && l.unidades_boas != null ? l.unidades_boas : l.bases_pedidos + l.bases_extras;
       const extras = Math.max(0, totalLote - itens.reduce((s, i) => s + i.quantidade, 0));
       for (let k = 1; k <= extras; k++) etiquetas.push({ receita, lote, pedido: null, indice: k, total: extras });
     }
   } else if (sp.pedido) {
     const { data: p } = await supabase.from("pedidos")
-      .select(`id, numero, cliente_nome, pedido_itens(quantidade, receitas(${CAMPOS_RECEITA}), lotes(numero, produzido_em, assado_em))`)
+      .select(`id, numero, cliente_nome, modalidade, condominio_nome, bloco, apto, pedido_itens(quantidade, receitas(${CAMPOS_RECEITA}), lotes(numero, produzido_em, assado_em))`)
       .eq("id", sp.pedido).maybeSingle();
     if (p) {
       titulo = `Pedido #${String(p.numero).padStart(4, "0")}`;
@@ -64,7 +71,7 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
       let n = 0;
       for (const it of (p.pedido_itens as any[]) ?? [])
         for (let k = 1; k <= it.quantidade; k++)
-          etiquetas.push({ receita: it.receitas, lote: it.lotes, pedido: { numero: p.numero, cliente: p.cliente_nome }, indice: ++n, total });
+          etiquetas.push({ receita: it.receitas, lote: it.lotes, pedido: { numero: p.numero, cliente: p.cliente_nome, local: localCurto(p) }, indice: ++n, total });
     }
   }
 
@@ -76,6 +83,8 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
 
   return (
     <>
+      {/* Tamanho do papel só nesta página: as outras telas imprimem em A4 */}
+      <style>{"@media print { @page { size: 100mm 150mm; margin: 0; } }"}</style>
       <div className="nao-imprimir">
         <div className="cabecalho">
           <div>
@@ -135,6 +144,7 @@ function EtiquetaBase({ e, cfg }: { e: Etiqueta; cfg: any }) {
         {e.pedido ? (
           <>
             <div className="et-cliente-nome">{e.pedido.cliente}</div>
+            {e.pedido.local && <div className="et-local">{e.pedido.local}</div>}
             <div>Pedido #{String(e.pedido.numero).padStart(4, "0")} · base {e.indice} de {e.total}</div>
           </>
         ) : <div className="et-cliente-nome">Estoque</div>}

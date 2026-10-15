@@ -9,16 +9,19 @@ interface Campanha {
   nome: string;
   ativa: boolean;
   entrega_em: string;
+  taxa_entrega_centavos: number;
   campanha_produtos: { receita_id: string; preco_centavos: number; ativo: boolean }[];
 }
 
 interface Linha { receita_id: string; quantidade: number; preco: string }
 
-export function FormPedidoManual({ receitas, campanhas }: { receitas: { id: string; nome: string }[]; campanhas: Campanha[] }) {
+export function FormPedidoManual({ receitas, campanhas, condominios }: { receitas: { id: string; nome: string }[]; campanhas: Campanha[]; condominios: { id: string; nome: string }[] }) {
   const inicial = campanhas.find((c) => c.ativa);
   const [campanhaId, setCampanhaId] = useState(inicial?.id ?? "");
   const [entrega, setEntrega] = useState(inicial?.entrega_em ?? "");
-  const [modalidade, setModalidade] = useState("entrega");
+  const [modalidade, setModalidade] = useState(condominios.length ? "condominio" : "entrega");
+  const fmt = (c: number) => (c ? (c / 100).toFixed(2).replace(".", ",") : "");
+  const [taxa, setTaxa] = useState(fmt(inicial?.taxa_entrega_centavos ?? 0));
   const camp = campanhas.find((c) => c.id === campanhaId);
   const precoSugerido = (rid: string) => {
     const p = camp?.campanha_produtos.find((x) => x.receita_id === rid && x.ativo);
@@ -32,7 +35,8 @@ export function FormPedidoManual({ receitas, campanhas }: { receitas: { id: stri
   const itens = linhas
     .filter((l) => l.quantidade > 0)
     .map((l) => ({ receita_id: l.receita_id, quantidade: l.quantidade, preco_centavos: lerBRL(l.preco) ?? -1 }));
-  const total = useMemo(() => itens.reduce((s, i) => s + i.quantidade * Math.max(0, i.preco_centavos), 0), [itens]);
+  const taxaCentavos = modalidade === "entrega" ? lerBRL(taxa) ?? 0 : 0;
+  const total = useMemo(() => itens.reduce((s, i) => s + i.quantidade * Math.max(0, i.preco_centavos), 0), [itens]) + taxaCentavos;
   const precoInvalido = itens.some((i) => i.preco_centavos < 0);
 
   return (
@@ -48,6 +52,7 @@ export function FormPedidoManual({ receitas, campanhas }: { receitas: { id: stri
             const c = campanhas.find((x) => x.id === id);
             if (c) {
               setEntrega(c.entrega_em);
+              setTaxa(fmt(c.taxa_entrega_centavos));
               setLinhas((ls) => ls.map((l) => {
                 const p = c.campanha_produtos.find((x) => x.receita_id === l.receita_id && x.ativo);
                 return p ? { ...l, preco: (p.preco_centavos / 100).toFixed(2).replace(".", ",") } : l;
@@ -80,6 +85,7 @@ export function FormPedidoManual({ receitas, campanhas }: { receitas: { id: stri
             </tbody>
           </table>
         </div>
+        {taxaCentavos > 0 && <div className="linha-total"><span>Taxa de entrega</span><span className="num">{formatarBRL(taxaCentavos)}</span></div>}
         <div className="linha-total forte"><span>Total</span><span className="num">{formatarBRL(total)}</span></div>
         {precoInvalido && <div className="aviso erro">Informe o preço de todos os itens com quantidade.</div>}
       </div>
@@ -92,14 +98,33 @@ export function FormPedidoManual({ receitas, campanhas }: { receitas: { id: stri
         </div>
         <div className="grade">
           <div className="campo">
-            <label htmlFor="modalidade">Entrega ou retirada</label>
+            <label htmlFor="modalidade">Como recebe</label>
             <select id="modalidade" name="modalidade" value={modalidade} onChange={(e) => setModalidade(e.target.value)}>
-              <option value="entrega">Entrega</option><option value="retirada">Retirada</option>
+              {condominios.length > 0 && <option value="condominio">Condomínio parceiro</option>}
+              <option value="entrega">Entrega em endereço</option><option value="retirada">Retirada</option>
             </select>
           </div>
           <div className="campo"><label htmlFor="entrega_em">Data</label><input id="entrega_em" name="entrega_em" type="date" value={entrega} onChange={(e) => setEntrega(e.target.value)} required /></div>
         </div>
-        {modalidade === "entrega" && <div className="campo"><label htmlFor="endereco">Endereço</label><textarea id="endereco" name="endereco" /></div>}
+        {modalidade === "condominio" && (
+          <div className="grade">
+            <div className="campo">
+              <label htmlFor="condominio_id">Condomínio</label>
+              <select id="condominio_id" name="condominio_id" required defaultValue="">
+                <option value="" disabled>Escolha…</option>
+                {condominios.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </div>
+            <div className="campo"><label htmlFor="bloco">Bloco (opcional)</label><input id="bloco" name="bloco" maxLength={20} /></div>
+            <div className="campo"><label htmlFor="apto">Apto ou casa</label><input id="apto" name="apto" maxLength={20} required /></div>
+          </div>
+        )}
+        {modalidade === "entrega" && (
+          <div className="grade">
+            <div className="campo" style={{ flex: 2 }}><label htmlFor="endereco">Endereço</label><textarea id="endereco" name="endereco" /></div>
+            <div className="campo"><label htmlFor="taxa_entrega">Taxa de entrega (R$)</label><input id="taxa_entrega" name="taxa_entrega" inputMode="decimal" value={taxa} onChange={(e) => setTaxa(e.target.value)} placeholder="0,00" /></div>
+          </div>
+        )}
         <div className="campo"><label htmlFor="observacoes">Observações</label><textarea id="observacoes" name="observacoes" /></div>
       </div>
 

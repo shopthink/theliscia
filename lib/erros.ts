@@ -6,12 +6,13 @@ export function mensagemDoBanco(e: { code?: string; message?: string } | null | 
     if (e.message?.includes("campanhas_uma_ativa")) return "Já existe outra campanha ativa. Pause-a antes de ativar esta.";
     if (e.message?.includes("pagamentos_referencia_unica")) return "Esta identificação de transação já foi usada em outro pagamento.";
     if (e.message?.includes("insumos_nome")) return "Já existe um insumo com esse nome.";
+    if (e.message?.includes("condominios_slug")) return "Já existe um condomínio com esse link. Escolha outro.";
     return "Registro duplicado.";
   }
   if (e.code === "23514") {
     if (e.message?.includes("campanha_datas_abertura")) return "A abertura não pode ser depois do encerramento.";
     if (e.message?.includes("campanha_datas_entrega")) return "A entrega não pode ser antes do encerramento dos pedidos.";
-    if (e.message?.includes("campanha_modalidade")) return "Permita entrega, retirada ou as duas.";
+    if (e.message?.includes("campanha_modalidade")) return "Escolha ao menos uma forma de receber: condomínios, entrega ou retirada.";
     return "Algum valor está fora do permitido.";
   }
   if (e.code === "42501") return "Acesso negado.";

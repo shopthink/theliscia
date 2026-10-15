@@ -6,9 +6,10 @@ export const metadata = { title: "Novo pedido" };
 
 export default async function NovoPedido() {
   const { supabase } = await exigirAdmin();
-  const [{ data: receitas }, { data: campanhas }] = await Promise.all([
-    supabase.from("receitas").select("id, nome").eq("ativa", true).order("nome"),
-    supabase.from("campanhas").select("id, nome, ativa, entrega_em, campanha_produtos(receita_id, preco_centavos, ativo)").order("abre_em", { ascending: false }).limit(12),
+  const [{ data: receitas }, { data: campanhas }, { data: condominios }] = await Promise.all([
+    supabase.from("receitas").select("id, nome").eq("ativa", true).eq("tipo", "base").order("nome"),
+    supabase.from("campanhas").select("id, nome, ativa, entrega_em, taxa_entrega_centavos, campanha_produtos(receita_id, preco_centavos, ativo)").order("abre_em", { ascending: false }).limit(12),
+    supabase.from("condominios").select("id, nome").eq("ativo", true).order("nome"),
   ]);
   return (
     <>
@@ -19,7 +20,7 @@ export default async function NovoPedido() {
           <p className="suave" style={{ margin: 0 }}>Para pedidos recebidos por WhatsApp, buffets ou comércios. Entra direto como confirmado.</p>
         </div>
       </div>
-      <FormPedidoManual receitas={receitas ?? []} campanhas={(campanhas ?? []) as any} />
+      <FormPedidoManual receitas={receitas ?? []} campanhas={(campanhas ?? []) as any} condominios={condominios ?? []} />
     </>
   );
 }

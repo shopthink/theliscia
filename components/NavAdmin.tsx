@@ -6,6 +6,7 @@ const ITENS: { href: string; rotulo: string; grupo?: string; emBreve?: boolean }
   { href: "/admin", rotulo: "Início" },
   { href: "/admin/pedidos", rotulo: "Pedidos", grupo: "Vendas" },
   { href: "/admin/campanhas", rotulo: "Campanhas" },
+  { href: "/admin/condominios", rotulo: "Condomínios" },
   { href: "/admin/compras", rotulo: "Compras e estoque", grupo: "Operação" },
   { href: "/admin/producao", rotulo: "Produção" },
   { href: "/admin/receitas", rotulo: "Receitas" },

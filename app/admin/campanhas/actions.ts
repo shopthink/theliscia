@@ -19,6 +19,8 @@ function lerCampanha(d: FormData) {
     entrega_em: txt(d, "entrega_em") ?? "",
     permite_entrega: d.get("permite_entrega") === "on",
     permite_retirada: d.get("permite_retirada") === "on",
+    permite_condominios: d.get("permite_condominios") === "on",
+    taxa_entrega_centavos: txt(d, "taxa_entrega") ? lerBRL(String(d.get("taxa_entrega"))) ?? -1 : 0,
     instrucoes_entrega: txt(d, "instrucoes_entrega"),
     regiao_atendida: txt(d, "regiao_atendida"),
     retirada_info: txt(d, "retirada_info"),
@@ -36,7 +38,8 @@ function validar(c: ReturnType<typeof lerCampanha>): string | null {
   if (!c.nome) return "Dê um nome à campanha, por exemplo “Outubro/2026”.";
   const erroData = validarDatasCampanha(c.abre_em, c.fecha_em, c.entrega_em);
   if (erroData) return erroData;
-  if (!c.permite_entrega && !c.permite_retirada) return "Permita entrega, retirada ou as duas.";
+  if (!c.permite_entrega && !c.permite_retirada && !c.permite_condominios) return "Escolha ao menos uma forma de receber: condomínios, entrega ou retirada.";
+  if (c.taxa_entrega_centavos < 0 || c.taxa_entrega_centavos > 100000) return "Informe uma taxa de entrega válida, por exemplo 8,00.";
   if (!Number.isInteger(c.pedido_minimo) || c.pedido_minimo < 1) return "O pedido mínimo deve ser pelo menos 1 base.";
   if (![50, 100].includes(c.percentual_sinal)) return "Escolha 100% ou 50% de sinal.";
   if (!Number.isInteger(c.horas_envio_comprovante) || c.horas_envio_comprovante < 1 || c.horas_envio_comprovante > 168)

@@ -6,6 +6,8 @@ export interface CampanhaForm {
   entrega_em?: string;
   permite_entrega?: boolean;
   permite_retirada?: boolean;
+  permite_condominios?: boolean;
+  taxa_entrega_centavos?: number;
   instrucoes_entrega?: string | null;
   regiao_atendida?: string | null;
   retirada_info?: string | null;
@@ -51,18 +53,24 @@ export function CamposCampanha({ c }: { c: CampanhaForm }) {
 
       <h2>Entrega e retirada</h2>
       <div className="acoes" style={{ marginBottom: "0.9rem" }}>
-        <label className="check"><input type="checkbox" name="permite_entrega" defaultChecked={c.permite_entrega ?? true} /> Faço entrega</label>
-        <label className="check"><input type="checkbox" name="permite_retirada" defaultChecked={c.permite_retirada ?? true} /> Cliente pode retirar</label>
+        <label className="check"><input type="checkbox" name="permite_condominios" defaultChecked={c.permite_condominios ?? true} /> Entrega nos condomínios parceiros (grátis)</label>
+        <label className="check"><input type="checkbox" name="permite_entrega" defaultChecked={c.permite_entrega ?? true} /> Entrega em outros endereços</label>
+        <label className="check"><input type="checkbox" name="permite_retirada" defaultChecked={c.permite_retirada ?? false} /> Cliente pode retirar</label>
       </div>
       <div className="grade">
+        <div className="campo">
+          <label htmlFor="taxa_entrega">Taxa de entrega fora de condomínio (R$)</label>
+          <input id="taxa_entrega" name="taxa_entrega" inputMode="decimal" placeholder="0,00"
+            defaultValue={c.taxa_entrega_centavos ? (c.taxa_entrega_centavos / 100).toFixed(2).replace(".", ",") : ""} />
+          <span className="ajuda">Somada ao total e ao Pix. Condomínio parceiro e retirada não pagam.</span>
+        </div>
         <div className="campo">
           <label htmlFor="regiao_atendida">Região atendida</label>
           <input id="regiao_atendida" name="regiao_atendida" defaultValue={c.regiao_atendida ?? ""} placeholder="Ex.: bairros onde você entrega" />
         </div>
         <div className="campo">
-          <label htmlFor="frete_info">Frete</label>
-          <input id="frete_info" name="frete_info" defaultValue={c.frete_info ?? ""} placeholder="Ex.: grátis na região; fora dela, combinamos" />
-          <span className="ajuda">Aparece antes do pagamento. Nenhum frete é somado automaticamente.</span>
+          <label htmlFor="frete_info">Aviso sobre entrega (opcional)</label>
+          <input id="frete_info" name="frete_info" defaultValue={c.frete_info ?? ""} placeholder="Ex.: fora da região, combinamos pelo WhatsApp" />
         </div>
       </div>
       <div className="grade">

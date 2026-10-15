@@ -6,6 +6,7 @@ import { formatarBRL } from "@/lib/dinheiro";
 import { formatarData, formatarDataExtenso, formatarDataHora } from "@/lib/datas";
 import { gerarPixCopiaECola } from "@/lib/pix";
 import { Copiar } from "@/components/Copiar";
+import { localEntrega } from "@/lib/condominios";
 import { TopoPublico, RodapePublico } from "@/components/Publico";
 import { EnvioComprovante } from "./EnvioComprovante";
 
@@ -19,7 +20,7 @@ export default async function PagamentoPedido({ params }: { params: Promise<{ to
   // Só os campos que o próprio cliente informou ou viu. O token não é previsível.
   const { data: s } = await sb
     .from("solicitacoes")
-    .select("id, numero, campanha_nome, cliente_nome, modalidade, endereco, entrega_em, pix_chave, pix_favorecido, pix_cidade, percentual_sinal, total_centavos, sinal_centavos, saldo_centavos, total_bases, status, comprovante_ate, solicitacao_itens(nome, quantidade, preco_unit_centavos, subtotal_centavos), comprovantes(enviado_em)")
+    .select("id, numero, campanha_nome, cliente_nome, modalidade, endereco, condominio_nome, bloco, apto, taxa_entrega_centavos, entrega_em, pix_chave, pix_favorecido, pix_cidade, percentual_sinal, total_centavos, sinal_centavos, saldo_centavos, total_bases, status, comprovante_ate, solicitacao_itens(nome, quantidade, preco_unit_centavos, subtotal_centavos), comprovantes(enviado_em)")
     .eq("token", token)
     .maybeSingle();
   if (!s) notFound();
@@ -104,6 +105,9 @@ export default async function PagamentoPedido({ params }: { params: Promise<{ to
               <span>{i.quantidade}× {i.nome}</span><span className="num">{formatarBRL(i.subtotal_centavos)}</span>
             </div>
           ))}
+          {s.modalidade === "entrega" && (
+            <div className="linha-total"><span>Entrega</span><span className="num">{s.taxa_entrega_centavos > 0 ? formatarBRL(s.taxa_entrega_centavos) : "grátis"}</span></div>
+          )}
           <div className="linha-total forte"><span>Total</span><span className="num">{formatarBRL(s.total_centavos)}</span></div>
           {s.percentual_sinal < 100 && (
             <>
@@ -114,7 +118,7 @@ export default async function PagamentoPedido({ params }: { params: Promise<{ to
           <hr />
           <p style={{ margin: 0 }}>
             <strong>{s.modalidade === "entrega" ? "Entrega" : "Retirada"}</strong> em {formatarData(s.entrega_em)}
-            {s.endereco ? <><br /><span className="suave">{s.endereco}</span></> : null}
+            {s.condominio_nome ? <><br /><span className="suave">{localEntrega(s)}</span></> : s.endereco ? <><br /><span className="suave">{s.endereco}</span></> : null}
           </p>
         </div>
         <p className="suave" style={{ fontSize: "0.85rem", textAlign: "center" }}>Guarde este link para acompanhar seu pedido.</p>

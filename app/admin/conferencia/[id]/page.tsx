@@ -7,6 +7,7 @@ import { formatarBRL } from "@/lib/dinheiro";
 import { formatarData, formatarDataHora } from "@/lib/datas";
 import { formatarTelefone, linkWhatsApp } from "@/lib/telefone";
 import { aprovar, recusar } from "@/app/admin/pedidos/actions";
+import { localEntrega } from "@/lib/condominios";
 
 export const metadata = { title: "Conferência de pagamento" };
 
@@ -47,6 +48,7 @@ export default async function Conferencia({ params }: { params: Promise<{ id: st
             </p>
             <p style={{ marginBottom: 0 }}>
               {s.modalidade === "entrega" ? "Entrega" : "Retirada"} em <strong>{formatarData(s.entrega_em)}</strong>
+              {s.condominio_nome && <><br /><strong>{localEntrega(s)}</strong></>}
               {s.endereco && <><br />{s.endereco}</>}
             </p>
             {s.observacoes && <p className="suave" style={{ marginTop: "0.5rem" }}>Obs.: {s.observacoes}</p>}
@@ -60,6 +62,7 @@ export default async function Conferencia({ params }: { params: Promise<{ id: st
             {(s.solicitacao_itens as any[]).map((i, k) => (
               <div key={k} className="linha-total"><span>{i.quantidade}× {i.nome} <span className="suave">({formatarBRL(i.preco_unit_centavos)})</span></span><span className="num">{formatarBRL(i.subtotal_centavos)}</span></div>
             ))}
+            {s.taxa_entrega_centavos > 0 && <div className="linha-total"><span>Taxa de entrega</span><span className="num">{formatarBRL(s.taxa_entrega_centavos)}</span></div>}
             <div className="linha-total forte"><span>Total</span><span className="num">{formatarBRL(s.total_centavos)}</span></div>
             <div className="linha-total"><span>Exigido para confirmar ({s.percentual_sinal}%)</span><strong className="num">{formatarBRL(s.sinal_centavos)}</strong></div>
             <div className="linha-total"><span>Saldo na entrega</span><span className="num">{formatarBRL(s.saldo_centavos)}</span></div>

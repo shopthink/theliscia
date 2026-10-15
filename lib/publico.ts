@@ -10,6 +10,8 @@ export interface CampanhaPublica {
   entrega_em: string;
   permite_entrega: boolean;
   permite_retirada: boolean;
+  permite_condominios: boolean;
+  taxa_entrega_centavos: number;
   instrucoes_entrega: string | null;
   regiao_atendida: string | null;
   retirada_info: string | null;
@@ -26,7 +28,7 @@ export async function carregarCampanhaPublica(): Promise<CampanhaPublica | null>
   const { data } = await sb
     .from("campanhas")
     .select(
-      "id, nome, abre_em, fecha_em, entrega_em, permite_entrega, permite_retirada, instrucoes_entrega, regiao_atendida, retirada_info, frete_info, pedido_minimo, percentual_sinal, horas_envio_comprovante, ativa, campanha_produtos(id, nome, descricao, preco_centavos, foto_url, ordem, ativo)",
+      "id, nome, abre_em, fecha_em, entrega_em, permite_entrega, permite_retirada, permite_condominios, taxa_entrega_centavos, instrucoes_entrega, regiao_atendida, retirada_info, frete_info, pedido_minimo, percentual_sinal, horas_envio_comprovante, ativa, campanha_produtos(id, nome, descricao, preco_centavos, foto_url, ordem, ativo)",
     )
     .eq("ativa", true)
     .maybeSingle();
@@ -39,6 +41,37 @@ export async function carregarCampanhaPublica(): Promise<CampanhaPublica | null>
       .sort((a: any, b: any) => a.ordem - b.ordem)
       .map(({ id, nome, descricao, preco_centavos, foto_url }: any) => ({ id, nome, descricao, preco_centavos, foto_url })),
   };
+}
+
+/** Condomínio parceiro como o morador vê: sem notas internas. */
+export interface CondominioPublico {
+  id: string;
+  nome: string;
+  slug: string;
+  forma_entrega: string;
+  janela_entrega: string | null;
+  instrucoes_cliente: string | null;
+  meta_bases: number | null;
+  bases: number;
+}
+
+export async function carregarCondominios(campanhaId: string | null): Promise<CondominioPublico[]> {
+  const sb = clienteServico();
+  const { data } = await sb
+    .from("condominios")
+    .select("id, nome, slug, forma_entrega, janela_entrega, instrucoes_cliente, meta_bases")
+    .eq("ativo", true)
+    .order("nome");
+  return Promise.all(
+    (data ?? []).map(async (c) => {
+      let bases = 0;
+      if (campanhaId && c.meta_bases) {
+        const { data: b } = await sb.rpc("bases_condominio", { p_condominio_id: c.id, p_campanha_id: campanhaId });
+        bases = Number(b ?? 0);
+      }
+      return { ...c, bases };
+    }),
+  );
 }
 
 export async function carregarContato() {

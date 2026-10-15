@@ -29,7 +29,9 @@ export async function enviarPedido(_: EstadoPedido, d: FormData): Promise<Estado
   }
   const nome = String(d.get("nome") ?? "").trim();
   const telefone = String(d.get("telefone") ?? "");
-  const modalidade = String(d.get("modalidade") ?? "");
+  const tipo = String(d.get("tipo") ?? "");
+  const condominio = tipo === "condominio" ? String(d.get("condominio_id") ?? "") : "";
+  if (tipo === "condominio" && !/^[0-9a-f-]{36}$/.test(condominio)) return { erro: "Escolha o seu condomínio." };
   if (!itens.length) return { erro: "Escolha ao menos um produto." };
   if (nome.length < 2) return { erro: "Informe seu nome." };
   if (!telefoneValido(telefone)) return { erro: "Informe o WhatsApp com DDD." };
@@ -39,10 +41,13 @@ export async function enviarPedido(_: EstadoPedido, d: FormData): Promise<Estado
     p_itens: itens,
     p_nome: nome,
     p_telefone: telefone,
-    p_modalidade: modalidade,
-    p_endereco: String(d.get("endereco") ?? ""),
+    p_modalidade: tipo === "condominio" ? "entrega" : tipo,
+    p_endereco: tipo === "entrega" ? String(d.get("endereco") ?? "") : "",
     p_observacoes: String(d.get("observacoes") ?? ""),
     p_origem_hash: await origemAnonima(),
+    p_condominio_id: condominio || null,
+    p_bloco: condominio ? String(d.get("bloco") ?? "") : null,
+    p_apto: condominio ? String(d.get("apto") ?? "") : null,
   });
   if (error) {
     return { erro: error.code === "P0001" ? error.message : "Não foi possível registrar o pedido agora. Tente de novo em instantes." };
