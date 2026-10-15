@@ -4,6 +4,7 @@ import { FormAcao } from "@/components/FormAcao";
 import { formatarBRL } from "@/lib/dinheiro";
 import { formatarData, formatarDataHora, hojeSP } from "@/lib/datas";
 import { montarLista } from "@/lib/listaCompras";
+import { descreverCombinacao, melhorCombinacao, opcoesSimples, type Embalagem } from "@/lib/embalagens";
 import { registrarAjuste, salvarFornecedor } from "./actions";
 
 export const metadata = { title: "Compras e estoque" };
@@ -206,14 +207,35 @@ async function Estoque() {
 
 async function ListaDeCompras() {
   const { supabase } = await exigirAdmin();
-  const [{ data: pedidos }, { data: cfg }, { data: insumos }, { data: saldos }] = await Promise.all([
+  const [{ data: pedidos }, { data: cfg }, { data: insumos }, { data: saldos }, { data: embs }, { data: ultimas }] = await Promise.all([
     supabase.from("pedidos")
       .select("id, pedido_itens(quantidade, receita_versoes(peso_bolinha_g, massa_base_g, receita_versao_ingredientes(insumo_id, quantidade)))")
       .in("status_producao", ["confirmado", "em_producao"]),
     supabase.from("configuracoes").select("semola_g_por_base, saco_vacuo_por_base, etiqueta_por_base, molho_ml_por_base, sacola_por_pedido").single(),
     supabase.from("insumos").select("id, nome, unidade, uso_auxiliar, entra_lista_compras, ativo").order("nome"),
-    supabase.from("estoque_saldos").select("insumo_id, quantidade"),
+    supabase.from("estoque_saldos").select("insumo_id, quantidade, valor_centavos"),
+    supabase.from("insumo_embalagens").select("id, insumo_id, nome, quantidade_base").eq("ativo", true),
+    supabase.from("compra_itens")
+      .select("insumo_id, pacotes, conteudo, unidade_conteudo, quantidade_base, custo_final_centavos, compras!inner(data, cancelada, numero)")
+      .eq("compras.cancelada", false)
+      .order("compra_id", { ascending: false })
+      .limit(500),
   ]);
+  // Preço de um pacote: última compra com a mesma embalagem; sem ela, estimativa pelo custo médio
+  const ultimaPorPacote = new Map<string, { preco: number; data: string }>();
+  for (const it of (ultimas ?? []) as any[]) {
+    const qbPacote = Number(it.quantidade_base) / Number(it.pacotes);
+    const chave = `${it.insumo_id}|${Math.round(qbPacote * 1000)}`;
+    const atual = ultimaPorPacote.get(chave);
+    if (!atual || it.compras.data > atual.data) ultimaPorPacote.set(chave, { preco: Math.round(it.custo_final_centavos / Number(it.pacotes)), data: it.compras.data });
+  }
+  const medio = new Map((saldos ?? []).filter((x) => Number(x.quantidade) > 0).map((x) => [x.insumo_id, Number(x.valor_centavos) / Number(x.quantidade)]));
+  const embalagensDe = (insumoId: string) => (embs ?? []).filter((e) => e.insumo_id === insumoId).map((e): Embalagem & { estimado: boolean } => {
+    const qb = Number(e.quantidade_base);
+    const real = ultimaPorPacote.get(`${insumoId}|${Math.round(qb * 1000)}`);
+    const m = medio.get(insumoId);
+    return { id: e.id, nome: e.nome, quantidade_base: qb, precoCentavos: real?.preco ?? (m != null ? Math.round(m * qb) : null), estimado: !real };
+  });
   const ped = (pedidos ?? []).map((p: any) => ({
     itens: (p.pedido_itens ?? []).map((i: any) => ({
       quantidade: i.quantidade,
@@ -237,16 +259,40 @@ async function ListaDeCompras() {
         {!comprar.length ? <div className="vazio">O estoque cobre os pedidos confirmados.</div> : (
           <div className="tabela-rolagem">
             <table>
-              <thead><tr><th>Insumo</th><th className="dir">Precisa</th><th className="dir">Tem</th><th className="dir">Comprar</th></tr></thead>
+              <thead><tr><th>Insumo</th><th className="dir">Precisa</th><th className="dir">Tem</th><th className="dir">Falta</th><th>Comprar</th></tr></thead>
               <tbody>
-                {comprar.map((l) => (
-                  <tr key={l.insumo.id}>
-                    <td><strong>{l.insumo.nome}</strong></td>
-                    <td className="dir num">{qtd(l.necessidade, l.insumo.unidade)}</td>
-                    <td className="dir num">{qtd(l.estoque, l.insumo.unidade)}</td>
-                    <td className="dir num"><strong>{qtd(l.comprar, l.insumo.unidade)}</strong></td>
-                  </tr>
-                ))}
+                {comprar.map((l) => {
+                  const ems = embalagensDe(l.insumo.id);
+                  const melhor = ems.length ? melhorCombinacao(l.comprar, ems) : null;
+                  const alternativas = ems.length > 1 ? opcoesSimples(l.comprar, ems).filter((o) => !melhor || descreverCombinacao(o) !== descreverCombinacao(melhor)) : [];
+                  const estimado = melhor?.itens.some((i) => (i.embalagem as any).estimado);
+                  return (
+                    <tr key={l.insumo.id}>
+                      <td><strong>{l.insumo.nome}</strong></td>
+                      <td className="dir num">{qtd(l.necessidade, l.insumo.unidade)}</td>
+                      <td className="dir num">{qtd(l.estoque, l.insumo.unidade)}</td>
+                      <td className="dir num">{qtd(l.comprar, l.insumo.unidade)}</td>
+                      <td>
+                        {melhor ? (
+                          <>
+                            <strong>{descreverCombinacao(melhor)}</strong>
+                            <div className="suave" style={{ fontSize: "0.82rem" }}>
+                              sobra {qtd(melhor.sobra, l.insumo.unidade)}
+                              {melhor.custoCentavos != null && <> · {estimado ? "≈ " : ""}{formatarBRL(melhor.custoCentavos)}{estimado ? " (estimado)" : ""}</>}
+                            </div>
+                            {alternativas.slice(0, 2).map((o) => (
+                              <div key={descreverCombinacao(o)} className="suave" style={{ fontSize: "0.78rem" }}>
+                                ou {descreverCombinacao(o)} (sobra {qtd(o.sobra, l.insumo.unidade)}{o.custoCentavos != null ? `, ${formatarBRL(o.custoCentavos)}` : ""})
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <span className="suave" style={{ fontSize: "0.85rem" }}>Cadastre as embalagens em Insumos para ver em pacotes</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

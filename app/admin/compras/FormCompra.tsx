@@ -7,7 +7,8 @@ import { custoTempo, normalizarQuantidade, ratear } from "@/lib/rateio";
 import { lerCupom, sugerirInsumo } from "@/lib/cupom";
 import { salvarCompra, type CompraForm } from "./actions";
 
-interface Insumo { id: string; nome: string; unidade: string }
+interface EmbalagemOpcao { id: string; nome: string; conteudo: number; unidade: string }
+interface Insumo { id: string; nome: string; unidade: string; embalagens?: EmbalagemOpcao[] }
 interface Fornecedor { id: string; nome: string }
 
 interface Linha {
@@ -282,6 +283,20 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
                     {insumos.map((i) => <option key={i.id} value={i.id}>{i.nome}</option>)}
                   </select>
                 </div>
+                {!!ins?.embalagens?.length && (
+                  <div className="campo" style={{ gridColumn: "span 2" }}>
+                    <label htmlFor={`e-${l.chave}`}>Embalagem</label>
+                    <select id={`e-${l.chave}`}
+                      value={ins.embalagens.find((e) => e.unidade === l.unidade && Number(e.conteudo) === num(l.conteudo))?.id ?? ""}
+                      onChange={(ev) => {
+                        const emb = ins.embalagens!.find((e) => e.id === ev.target.value);
+                        if (emb) set(k, { conteudo: String(emb.conteudo).replace(".", ","), unidade: emb.unidade });
+                      }}>
+                      <option value="">Outra (digitar)</option>
+                      {ins.embalagens.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="campo">
                   <label htmlFor={`p-${l.chave}`}>Pacotes</label>
                   <input id={`p-${l.chave}`} inputMode="decimal" value={l.pacotes} style={!(num(l.pacotes) > 0) ? destaque : undefined}

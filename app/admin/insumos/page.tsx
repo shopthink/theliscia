@@ -1,6 +1,6 @@
 import { exigirAdmin } from "@/lib/auth";
 import { FormAcao } from "@/components/FormAcao";
-import { salvarInsumo } from "./actions";
+import { removerEmbalagem, salvarEmbalagem, salvarInsumo } from "./actions";
 
 export const metadata = { title: "Insumos" };
 
@@ -13,7 +13,7 @@ const POR: Record<string, string> = { g: "por kg", ml: "por litro", un: "por uni
 
 export default async function Insumos() {
   const { supabase } = await exigirAdmin();
-  const { data: insumos } = await supabase.from("insumos").select("*").order("categoria").order("nome");
+  const { data: insumos } = await supabase.from("insumos").select("*, insumo_embalagens(id, nome, conteudo, unidade)").order("categoria").order("nome");
   return (
     <>
       <div className="cabecalho">
@@ -32,6 +32,7 @@ export default async function Insumos() {
             <input type="hidden" name="unidade" value={i.unidade} />
             <Campos i={i} />
           </FormAcao>
+          <Embalagens i={i} />
         </div>
       ))}
       <div className="cartao">
@@ -79,6 +80,42 @@ function Campos({ i, novo }: { i: any; novo?: boolean }) {
         <label className="check"><input type="checkbox" name="entra_lista_compras" defaultChecked={i.entra_lista_compras} /> Entra na lista de compras</label>
         {!novo && <label className="check"><input type="checkbox" name="ativo" defaultChecked={i.ativo} /> Ativo</label>}
       </div>
+    </div>
+  );
+}
+
+const UN_EMB: Record<string, { v: string; r: string }[]> = {
+  g: [{ v: "kg", r: "kg" }, { v: "g", r: "g" }],
+  ml: [{ v: "l", r: "L" }, { v: "ml", r: "ml" }],
+  un: [{ v: "un", r: "unidades" }],
+};
+
+function Embalagens({ i }: { i: any }) {
+  const lista = [...(i.insumo_embalagens ?? [])].sort((a: any, b: any) => Number(a.conteudo) - Number(b.conteudo));
+  return (
+    <div style={{ borderTop: "1px solid var(--creme-2)", marginTop: "0.9rem", paddingTop: "0.9rem" }}>
+      <div className="caixa-alta suave" style={{ marginBottom: "0.4rem" }}>Embalagens em que você compra</div>
+      {!lista.length && <p className="suave" style={{ fontSize: "0.9rem" }}>Nenhuma ainda. Ex.: pacote 5 kg, lata 350 ml, caixa com 100 un.</p>}
+      <div className="acoes" style={{ marginBottom: "0.6rem" }}>
+        {lista.map((e: any) => (
+          <FormAcao key={e.id} acao={removerEmbalagem} botao={`${e.nome}  ×`} classeBotao="contorno pequeno" confirmar={`Remover ${e.nome}?`}>
+            <input type="hidden" name="id" value={e.id} />
+          </FormAcao>
+        ))}
+      </div>
+      <FormAcao acao={salvarEmbalagem} botao="Adicionar embalagem" classeBotao="contorno pequeno" limparAoSalvar>
+        <input type="hidden" name="insumo_id" value={i.id} />
+        <div className="grade" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+          <div className="campo"><label htmlFor={`en-${i.id}`}>Nome (opcional)</label><input id={`en-${i.id}`} name="nome" placeholder="Ex.: Lata 400 g" /></div>
+          <div className="campo"><label htmlFor={`ec-${i.id}`}>Conteúdo</label><input id={`ec-${i.id}`} name="conteudo" inputMode="decimal" required placeholder="Ex.: 5" /></div>
+          <div className="campo">
+            <label htmlFor={`eu-${i.id}`}>Unidade</label>
+            <select id={`eu-${i.id}`} name="unidade" defaultValue={UN_EMB[i.unidade][0].v}>
+              {UN_EMB[i.unidade].map((u) => <option key={u.v} value={u.v}>{u.r}</option>)}
+            </select>
+          </div>
+        </div>
+      </FormAcao>
     </div>
   );
 }

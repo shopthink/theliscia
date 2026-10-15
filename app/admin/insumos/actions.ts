@@ -41,3 +41,25 @@ export async function salvarInsumo(_: EstadoForm, d: FormData): Promise<EstadoFo
   revalidatePath("/admin/insumos");
   return { ok: id ? "Insumo salvo." : "Insumo cadastrado." };
 }
+
+export async function salvarEmbalagem(_: EstadoForm, d: FormData): Promise<EstadoForm> {
+  const { supabase } = await exigirAdmin();
+  const conteudo = Number(String(d.get("conteudo") ?? "").replace(",", "."));
+  const unidade = String(d.get("unidade") ?? "");
+  let nome = String(d.get("nome") ?? "").trim();
+  if (!(conteudo > 0)) return { erro: "Informe o conteúdo da embalagem." };
+  if (!["g", "kg", "ml", "l", "un"].includes(unidade)) return { erro: "Escolha a unidade." };
+  if (!nome) nome = `${unidade === "un" ? "Pacote" : "Embalagem"} ${String(conteudo).replace(".", ",")} ${unidade === "l" ? "L" : unidade}`;
+  const { error } = await supabase.from("insumo_embalagens").insert({ insumo_id: String(d.get("insumo_id")), nome, conteudo, unidade });
+  if (error) return { erro: error.code === "23505" ? "Essa embalagem já está cadastrada." : mensagemDoBanco(error) };
+  revalidatePath("/admin/insumos");
+  return { ok: "Embalagem adicionada." };
+}
+
+export async function removerEmbalagem(_: EstadoForm, d: FormData): Promise<EstadoForm> {
+  const { supabase } = await exigirAdmin();
+  const { error } = await supabase.from("insumo_embalagens").delete().eq("id", String(d.get("id")));
+  if (error) return { erro: mensagemDoBanco(error) };
+  revalidatePath("/admin/insumos");
+  return { ok: "Embalagem removida." };
+}

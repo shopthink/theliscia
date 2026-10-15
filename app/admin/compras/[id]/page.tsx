@@ -26,13 +26,13 @@ export default async function Compra({ params, searchParams }: { params: Promise
 
   if (sp.editar && !c.cancelada) {
     const [{ data: insumos }, { data: fornecedores }] = await Promise.all([
-      supabase.from("insumos").select("id, nome, unidade").order("nome"),
+      supabase.from("insumos").select("id, nome, unidade, insumo_embalagens(id, nome, conteudo, unidade)").order("nome"),
       supabase.from("fornecedores").select("id, nome").order("nome"),
     ]);
     return (
       <>
         <div className="cabecalho"><div><Link href={`/admin/compras/${id}`} className="suave">← {codigo}</Link><h1>Editar compra {codigo}</h1></div></div>
-        <FormCompra insumos={insumos ?? []} fornecedores={fornecedores ?? []} valorHora={c.valor_hora_centavos}
+        <FormCompra insumos={(insumos ?? []).map((i: any) => ({ ...i, embalagens: (i.insumo_embalagens ?? []).map((e: any) => ({ ...e, conteudo: Number(e.conteudo) })) }))} fornecedores={fornecedores ?? []} valorHora={c.valor_hora_centavos}
           inicial={{ ...c, itens: itens.map((i) => ({ ...i, pacotes: Number(i.pacotes), conteudo: Number(i.conteudo) })) }} />
       </>
     );

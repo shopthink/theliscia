@@ -127,4 +127,14 @@ describe.skipIf(!HOST)("compras e estoque", () => {
     const f = await amb.como("admin", `select count(*)::int as n from public.fornecedores`);
     expect(f[0].n).toBe(1);
   });
+
+  it("embalagens: sementes e unidade compatível", async () => {
+    const e = await amb.como("admin", `select nome, quantidade_base::float as qb from public.insumo_embalagens where insumo_id = $1 order by conteudo`, [ins["Farinha"]]);
+    expect(e).toEqual([{ nome: "Pacote 1 kg", qb: 1000 }, { nome: "Pacote 5 kg", qb: 5000 }, { nome: "Pacote 10 kg", qb: 10000 }]);
+    await expect(amb.como("admin", `insert into public.insumo_embalagens (insumo_id, nome, conteudo, unidade) values ($1, 'x', 1, 'l')`, [ins["Farinha"]]))
+      .rejects.toThrow(/g ou kg/);
+    await amb.como("admin", `insert into public.insumo_embalagens (insumo_id, nome, conteudo, unidade) values ($1, 'Lata 1 L', 1, 'l')`, [ins["Molho de marcação"]]);
+    await expect(amb.como("outro", `insert into public.insumo_embalagens (insumo_id, nome, conteudo, unidade) values ($1, 'y', 2, 'kg')`, [ins["Farinha"]]))
+      .rejects.toThrow(/row-level security/);
+  });
 });
