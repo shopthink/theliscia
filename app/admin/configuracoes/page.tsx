@@ -44,6 +44,14 @@ export default async function Configuracoes() {
             <div className="campo"><label htmlFor="molho_g_por_base">Molho de marcação por base (g)</label><input id="molho_g_por_base" name="molho_g_por_base" inputMode="decimal" defaultValue={n(c.molho_g_por_base)} /><span className="ajuda">0 = sem molho.</span></div>
             <div className="campo"><label htmlFor="sacola_por_pedido">Sacolas kraft por pedido</label><input id="sacola_por_pedido" name="sacola_por_pedido" inputMode="decimal" defaultValue={n(c.sacola_por_pedido)} /></div>
           </div>
+          <h2>Fabricante (rodapé da etiqueta)</h2>
+          <p className="suave">Quem produz e responde pelo produto. Confirme as exigências para o seu enquadramento (MEI, alvará, vigilância sanitária).</p>
+          <div className="grade">
+            <div className="campo"><label htmlFor="rotulo_fabricante">Nome ou razão social</label><input id="rotulo_fabricante" name="rotulo_fabricante" defaultValue={c.rotulo_fabricante ?? ""} /></div>
+            <div className="campo"><label htmlFor="rotulo_documento">CNPJ ou CPF</label><input id="rotulo_documento" name="rotulo_documento" defaultValue={c.rotulo_documento ?? ""} /></div>
+            <div className="campo"><label htmlFor="rotulo_endereco">Endereço</label><input id="rotulo_endereco" name="rotulo_endereco" defaultValue={c.rotulo_endereco ?? ""} /></div>
+            <div className="campo"><label htmlFor="rotulo_contato">Contato (SAC)</label><input id="rotulo_contato" name="rotulo_contato" defaultValue={c.rotulo_contato ?? ""} placeholder="WhatsApp ou e-mail" /></div>
+          </div>
           <h2>Tempos de referência da produção</h2>
           <p className="suave">Usados nas contagens regressivas das esperas. Não contam como trabalho.</p>
           <div className="grade">

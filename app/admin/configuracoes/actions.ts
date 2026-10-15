@@ -30,6 +30,10 @@ export async function salvarConfiguracoes(_: EstadoForm, d: FormData): Promise<E
     geladeira_min: Math.round(num(d, "geladeira_h") * 60),
     freezer_min: Math.round(num(d, "freezer_h") * 60),
     esfriar_min: num(d, "esfriar_min"),
+    rotulo_fabricante: String(d.get("rotulo_fabricante") ?? "").trim() || null,
+    rotulo_documento: String(d.get("rotulo_documento") ?? "").trim() || null,
+    rotulo_endereco: String(d.get("rotulo_endereco") ?? "").trim() || null,
+    rotulo_contato: String(d.get("rotulo_contato") ?? "").trim() || null,
   };
   if (Object.values(linha).some((v) => typeof v === "number" && Number.isNaN(v))) return { erro: "Use apenas números positivos." };
   if (linha.taxa_percentual > 100) return { erro: "A taxa deve ficar entre 0 e 100%." };

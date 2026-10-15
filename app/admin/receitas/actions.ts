@@ -47,3 +47,39 @@ export async function criarReceita(_: EstadoForm, d: FormData): Promise<EstadoFo
   revalidatePath("/admin/receitas");
   return { ok: "Receita criada. Abra-a para cadastrar a ficha técnica.", dados: { id: data.id } };
 }
+
+export async function salvarRotulo(_: EstadoForm, d: FormData): Promise<EstadoForm> {
+  const { supabase } = await exigirAdmin();
+  const id = String(d.get("receita_id"));
+  const num = (k: string) => {
+    const t = String(d.get(k) ?? "").trim().replace(",", ".");
+    if (!t) return null;
+    const v = Number(t);
+    return Number.isFinite(v) && v > 0 ? v : NaN;
+  };
+  const linha = {
+    rotulo_nome: String(d.get("rotulo_nome") ?? "").trim() || null,
+    rotulo_ingredientes: String(d.get("rotulo_ingredientes") ?? "").trim() || null,
+    rotulo_alergenicos: String(d.get("rotulo_alergenicos") ?? "").trim() || null,
+    rotulo_conservacao: String(d.get("rotulo_conservacao") ?? "").trim() || null,
+    rotulo_preparo: String(d.get("rotulo_preparo") ?? "").trim() || null,
+    validade_dias: num("validade_dias"),
+    peso_assado_g: num("peso_assado_g"),
+    porcao_g: num("porcao_g"),
+    porcao_medida: String(d.get("porcao_medida") ?? "").trim() || null,
+  };
+  if ([linha.validade_dias, linha.peso_assado_g, linha.porcao_g].some((v) => Number.isNaN(v))) return { erro: "Use números positivos." };
+  if (linha.validade_dias != null) linha.validade_dias = Math.round(linha.validade_dias);
+  const { error } = await supabase.from("receitas").update(linha).eq("id", id);
+  if (error) return { erro: mensagemDoBanco(error) };
+  revalidatePath(`/admin/receitas/${id}`);
+  return { ok: "Dados do rótulo salvos." };
+}
+
+export async function validarNutricao(receitaId: string, valores: Record<string, number>): Promise<{ erro?: string; ok?: string }> {
+  const { supabase } = await exigirAdmin();
+  const { error } = await supabase.rpc("validar_nutricao", { p_receita_id: receitaId, p_valores: valores });
+  if (error) return { erro: mensagemDoBanco(error) };
+  revalidatePath(`/admin/receitas/${receitaId}`);
+  return { ok: "Tabela validada. As etiquetas passam a usar estes valores." };
+}

@@ -63,3 +63,25 @@ export async function removerEmbalagem(_: EstadoForm, d: FormData): Promise<Esta
   revalidatePath("/admin/insumos");
   return { ok: "Embalagem removida." };
 }
+
+const CAMPOS_NUTRI = ["kcal", "carboidratos_g", "acucares_totais_g", "acucares_adic_g", "proteinas_g", "gorduras_g", "saturadas_g", "trans_g", "fibras_g", "sodio_mg"];
+
+export async function salvarNutricaoInsumo(_: EstadoForm, d: FormData): Promise<EstadoForm> {
+  const { supabase } = await exigirAdmin();
+  const linha: Record<string, number | string | null> = {};
+  const vazios = CAMPOS_NUTRI.filter((c) => String(d.get(c) ?? "").trim() === "");
+  if (vazios.length && vazios.length < CAMPOS_NUTRI.length) return { erro: "Preencha todos os campos (use 0 quando não tiver) ou deixe todos vazios." };
+  for (const c of CAMPOS_NUTRI) {
+    const t = String(d.get(c) ?? "").trim().replace(",", ".");
+    if (t === "") { linha[`nutri_${c}`] = null; continue; }
+    const v = Number(t);
+    if (!Number.isFinite(v) || v < 0) return { erro: "Use apenas números positivos." };
+    linha[`nutri_${c}`] = v;
+  }
+  linha.nutri_fonte = String(d.get("fonte") ?? "").trim() || null;
+  const { error } = await supabase.from("insumos").update(linha).eq("id", String(d.get("id")));
+  if (error) return { erro: mensagemDoBanco(error) };
+  revalidatePath("/admin/insumos");
+  revalidatePath("/admin/receitas", "layout");
+  return { ok: "Tabela nutricional do insumo salva." };
+}

@@ -1,6 +1,7 @@
 import { exigirAdmin } from "@/lib/auth";
 import { FormAcao } from "@/components/FormAcao";
-import { removerEmbalagem, salvarEmbalagem, salvarInsumo } from "./actions";
+import { removerEmbalagem, salvarEmbalagem, salvarInsumo, salvarNutricaoInsumo } from "./actions";
+import { NUTRIENTES } from "@/lib/nutricao";
 
 export const metadata = { title: "Insumos" };
 
@@ -33,6 +34,7 @@ export default async function Insumos() {
             <Campos i={i} />
           </FormAcao>
           <Embalagens i={i} />
+          {i.categoria !== "embalagem" && <Nutricao i={i} />}
         </div>
       ))}
       <div className="cartao">
@@ -117,5 +119,33 @@ function Embalagens({ i }: { i: any }) {
         </div>
       </FormAcao>
     </div>
+  );
+}
+
+function Nutricao({ i }: { i: any }) {
+  const por = i.unidade === "ml" ? "100 ml" : i.unidade === "un" ? "unidade" : "100 g";
+  const tem = i.nutri_kcal != null;
+  return (
+    <details style={{ borderTop: "1px solid var(--creme-2)", marginTop: "0.9rem", paddingTop: "0.9rem" }}>
+      <summary className="caixa-alta suave" style={{ cursor: "pointer" }}>
+        Tabela nutricional (por {por}) {tem ? <span className="selo ok">preenchida</span> : <span className="selo alerta">sem dados</span>}
+      </summary>
+      <FormAcao acao={salvarNutricaoInsumo} botao="Salvar tabela do insumo" classeBotao="contorno pequeno">
+        <input type="hidden" name="id" value={i.id} />
+        <div className="grade" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", marginTop: "0.6rem" }}>
+          {NUTRIENTES.map((n) => (
+            <div className="campo" key={n.chave}>
+              <label htmlFor={`${n.chave}-${i.id}`}>{n.rotulo} ({n.unidade})</label>
+              <input id={`${n.chave}-${i.id}`} name={n.chave} inputMode="decimal"
+                defaultValue={i[`nutri_${n.chave}`] != null ? String(Number(i[`nutri_${n.chave}`])).replace(".", ",") : ""} />
+            </div>
+          ))}
+        </div>
+        <div className="campo"><label htmlFor={`fonte-${i.id}`}>Fonte dos dados</label>
+          <input id={`fonte-${i.id}`} name="fonte" defaultValue={i.nutri_fonte ?? ""} placeholder="Ex.: rótulo da farinha marca X" />
+          <span className="ajuda">Prefira o rótulo do produto que você compra. Valores pré-preenchidos são referências aproximadas.</span>
+        </div>
+      </FormAcao>
+    </details>
   );
 }

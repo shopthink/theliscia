@@ -46,6 +46,11 @@ export default async function Lote({ params, searchParams }: { params: Promise<{
           </p>
         </div>
       </div>
+      {l.tipo === "base" && l.status !== "cancelado" && (
+        <div className="acoes" style={{ marginBottom: "1rem" }}>
+          <Link className="botao contorno" href={`/admin/etiquetas?lote=${l.id}`}>🏷 Imprimir etiquetas do lote</Link>
+        </div>
+      )}
       {criado && l.status === "planejado" && <div className="aviso ok">Lote criado. Quando começar, aperte play na etapa.</div>}
       {l.status === "cancelado" && <div className="aviso erro">Cancelado em {formatarDataHora(l.cancelado_em)}: {l.cancelado_motivo}</div>}
 

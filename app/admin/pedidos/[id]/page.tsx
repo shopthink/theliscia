@@ -37,6 +37,9 @@ export default async function Pedido({ params, searchParams }: { params: Promise
           <div className="acoes" style={{ marginTop: "0.35rem" }}><SeloPagamento valor={p.status_pagamento} /><SeloProducao valor={p.status_producao} /></div>
         </div>
       </div>
+      <div className="acoes" style={{ marginBottom: "1rem" }}>
+        <Link className="botao contorno" href={`/admin/etiquetas?pedido=${p.id}`}>🏷 Imprimir etiquetas</Link>
+      </div>
       {sp.aprovado && <div className="aviso ok">Pagamento aprovado. O pedido entrou na lista de produção.</div>}
       {sp.criado && <div className="aviso ok">Pedido criado.</div>}
 

@@ -4,6 +4,7 @@ import { exigirAdmin } from "@/lib/auth";
 import { formatarDataHora } from "@/lib/datas";
 import { EditorReceita } from "./EditorReceita";
 import { Calculadora } from "./Calculadora";
+import { Rotulo } from "./Rotulo";
 
 export const metadata = { title: "Receita" };
 
@@ -11,8 +12,8 @@ export default async function Receita({ params }: { params: Promise<{ id: string
   const { id } = await params;
   const { supabase } = await exigirAdmin();
   const [{ data: r }, { data: insumos }] = await Promise.all([
-    supabase.from("receitas").select("id, nome, tipo, versao_atual_id, produz:insumos!receitas_produz_insumo_id_fkey(nome, unidade), receita_versoes!receita_versoes_receita_id_fkey(id, numero, peso_bolinha_g, massa_base_g, rendimento, observacoes, criado_em, receita_versao_ingredientes(insumo_id, quantidade, densidade_g, insumos(nome, unidade)))").eq("id", id).maybeSingle(),
-    supabase.from("insumos").select("id, nome, unidade, categoria").eq("ativo", true).order("nome"),
+    supabase.from("receitas").select("id, nome, tipo, versao_atual_id, rotulo_nome, rotulo_ingredientes, rotulo_alergenicos, rotulo_conservacao, rotulo_preparo, validade_dias, peso_assado_g, porcao_g, porcao_medida, nutricao, nutricao_versao_id, nutricao_validada_em, produz:insumos!receitas_produz_insumo_id_fkey(nome, unidade), receita_versoes!receita_versoes_receita_id_fkey(id, numero, peso_bolinha_g, massa_base_g, rendimento, observacoes, criado_em, receita_versao_ingredientes(insumo_id, quantidade, densidade_g, insumos(nome, unidade)))").eq("id", id).maybeSingle(),
+    supabase.from("insumos").select("id, nome, unidade, categoria, nutri_kcal, nutri_carboidratos_g, nutri_acucares_totais_g, nutri_acucares_adic_g, nutri_proteinas_g, nutri_gorduras_g, nutri_saturadas_g, nutri_trans_g, nutri_fibras_g, nutri_sodio_mg").eq("ativo", true).order("nome"),
   ]);
   if (!r) notFound();
   const versoes = [...(r.receita_versoes as any[])].sort((a, b) => b.numero - a.numero);
@@ -54,6 +55,22 @@ export default async function Receita({ params }: { params: Promise<{ id: string
         </div>
       )}
       {atual && !preparo && <Calculadora ingredientes={ings} pesoPadrao={Number(atual.peso_bolinha_g)} farinhaId={farinha} />}
+      {atual && !preparo && (
+        <Rotulo
+          r={{
+            id: r.id, rotulo_nome: (r as any).rotulo_nome, rotulo_ingredientes: (r as any).rotulo_ingredientes, rotulo_alergenicos: (r as any).rotulo_alergenicos,
+            rotulo_conservacao: (r as any).rotulo_conservacao, rotulo_preparo: (r as any).rotulo_preparo, validade_dias: (r as any).validade_dias,
+            peso_assado_g: (r as any).peso_assado_g != null ? Number((r as any).peso_assado_g) : null,
+            porcao_g: (r as any).porcao_g != null ? Number((r as any).porcao_g) : null, porcao_medida: (r as any).porcao_medida,
+            nutricao: (r as any).nutricao, nutricao_validada_em: (r as any).nutricao_validada_em,
+            nutricao_desatualizada: !!(r as any).nutricao_validada_em && (r as any).nutricao_versao_id !== r.versao_atual_id,
+          }}
+          ingredientes={ings.map((i: any) => ({ insumo_id: i.insumo_id, quantidade: i.quantidade }))}
+          insumos={(insumos ?? []).map((i: any) => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, k.startsWith("nutri_") && v != null ? Number(v) : v]))) as any}
+          massaBaseG={Number(atual.massa_base_g)}
+          pesoBolinhaG={Number(atual.peso_bolinha_g)}
+        />
+      )}
       <div className="cartao">
         <h2>{atual ? "Editar (cria uma nova versão)" : "Cadastrar ficha técnica"}</h2>
         <p className="suave">Editar nunca altera pedidos ou lotes que já usaram a versão anterior.</p>

@@ -57,7 +57,8 @@ describe.skipIf(!HOST)("produção", () => {
     expect(c["Saco para vácuo"]).toBe(6);
     expect(c["Sacola kraft"]).toBe(2);
     const p = await q(`select status_producao from public.pedidos order by numero`);
-    expect(p.map((x) => x.status_producao)).toEqual(["em_producao", "em_producao"]);
+    // Planejar não muda o status: só o primeiro play
+    expect(p.map((x) => x.status_producao)).toEqual(["confirmado", "confirmado"]);
     // item já em lote não entra em outro
     await expect(q(`select public.criar_lote($1::jsonb)`, [JSON.stringify({ receita_id: rec.italiana, item_ids: [itens["Bia-Italiana clássica"]] })]))
       .rejects.toThrow(/outro lote/);
@@ -66,6 +67,8 @@ describe.skipIf(!HOST)("produção", () => {
   it("cronômetro: só uma sessão aberta; geladeira não conta (teste 7)", async () => {
     const t = (h: string) => `2026-10-05T${h}:00-03:00`;
     await q(`select public.iniciar_etapa($1, 'massa', $2)`, [lote, t("08:00")]);
+    const st = await q(`select status_producao from public.pedidos order by numero`);
+    expect(st.map((x) => x.status_producao)).toEqual(["em_producao", "em_producao"]);
     // play em outra etapa pausa a anterior automaticamente
     await q(`select public.iniciar_etapa($1, 'bolear', $2)`, [lote, t("08:20")]);
     await q(`select public.iniciar_espera($1, 'descanso', $2)`, [lote, t("08:30")]); // pausa o trabalho
@@ -167,5 +170,14 @@ describe.skipIf(!HOST)("produção", () => {
     expect(await amb.como("outro", `select * from public.lotes`)).toHaveLength(0);
     await expect(amb.como("outro", `select public.criar_lote('{}'::jsonb)`)).rejects.toThrow(/Acesso negado/);
     await expect(amb.como("anon", `select * from public.lote_sessoes`)).rejects.toThrow(/permission denied/);
+  });
+
+  it("tabela nutricional: só o admin valida e todos os campos são obrigatórios", async () => {
+    const v = { kcal: 250, carboidratos_g: 50, acucares_totais_g: 0.5, acucares_adic_g: 0, proteinas_g: 8, gorduras_g: 1, saturadas_g: 0.2, trans_g: 0, fibras_g: 2, sodio_mg: 820 };
+    await expect(q(`select public.validar_nutricao($1, $2::jsonb)`, [rec.italiana, JSON.stringify({ ...v, sodio_mg: null })])).rejects.toThrow(/sodio_mg/);
+    await expect(amb.como("outro", `select public.validar_nutricao($1, $2::jsonb)`, [rec.italiana, JSON.stringify(v)])).rejects.toThrow(/Acesso negado/);
+    await q(`select public.validar_nutricao($1, $2::jsonb)`, [rec.italiana, JSON.stringify(v)]);
+    const r = await um(`select (nutricao->>'sodio_mg')::int as na, nutricao_versao_id = versao_atual_id as mesma, rotulo_alergenicos from public.receitas where id = $1`, [rec.italiana]);
+    expect(r).toEqual({ na: 820, mesma: true, rotulo_alergenicos: "ALÉRGICOS: CONTÉM TRIGO E CEVADA. CONTÉM GLÚTEN." });
   });
 });
