@@ -59,7 +59,6 @@ export async function salvarRotulo(_: EstadoForm, d: FormData): Promise<EstadoFo
   };
   const linha = {
     rotulo_nome: String(d.get("rotulo_nome") ?? "").trim() || null,
-    rotulo_ingredientes: String(d.get("rotulo_ingredientes") ?? "").trim() || null,
     rotulo_alergenicos: String(d.get("rotulo_alergenicos") ?? "").trim() || null,
     rotulo_conservacao: String(d.get("rotulo_conservacao") ?? "").trim() || null,
     rotulo_preparo: String(d.get("rotulo_preparo") ?? "").trim() || null,
@@ -76,10 +75,15 @@ export async function salvarRotulo(_: EstadoForm, d: FormData): Promise<EstadoFo
   return { ok: "Dados do rótulo salvos." };
 }
 
-export async function validarNutricao(receitaId: string, valores: Record<string, number>): Promise<{ erro?: string; ok?: string }> {
+export async function validarNutricao(
+  receitaId: string, valores: Record<string, number>, marcas: Record<string, string | null>, ingredientes: string,
+): Promise<{ erro?: string; ok?: string }> {
   const { supabase } = await exigirAdmin();
-  const { error } = await supabase.rpc("validar_nutricao", { p_receita_id: receitaId, p_valores: valores });
+  const { error } = await supabase.rpc("validar_nutricao", {
+    p_receita_id: receitaId, p_valores: valores, p_marcas: marcas, p_ingredientes: ingredientes,
+  });
   if (error) return { erro: mensagemDoBanco(error) };
   revalidatePath(`/admin/receitas/${receitaId}`);
-  return { ok: "Tabela validada. As etiquetas passam a usar estes valores." };
+  revalidatePath("/admin/etiquetas");
+  return { ok: "Tabela validada para esta combinação de marcas. Os lotes com estas marcas já podem imprimir etiqueta." };
 }

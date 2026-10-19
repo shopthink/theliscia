@@ -23,8 +23,15 @@ export default async function NovoLote({ searchParams }: { searchParams: Promise
       .eq("receita_id", rid ?? "").is("lote_id", null)
       .in("pedidos.status_producao", ["confirmado", "em_producao"]),
     supabase.from("configuracoes").select("semola_g_por_base, saco_vacuo_por_base, etiqueta_por_base, molho_g_por_base").single(),
-    supabase.from("estoque_saldos").select("insumo_id, quantidade"),
+    supabase.from("estoque_saldos").select("insumo_id, marca_id, quantidade, marcas(em_uso)"),
   ]);
+  // Estoque da marca em uso de cada insumo (sem marca em uso: o total do insumo)
+  const comEmUso = new Set((saldos ?? []).filter((x: any) => x.marcas?.em_uso).map((x) => x.insumo_id));
+  const estoqueLote: Record<string, number> = {};
+  for (const x of (saldos ?? []) as any[]) {
+    if (comEmUso.has(x.insumo_id) && !x.marcas?.em_uso) continue;
+    estoqueLote[x.insumo_id] = (estoqueLote[x.insumo_id] ?? 0) + Number(x.quantidade);
+  }
   const { data: auxiliares } = await supabase.from("insumos").select("id, nome, unidade, uso_auxiliar").not("uso_auxiliar", "is", null);
 
   return (
@@ -52,7 +59,7 @@ export default async function NovoLote({ searchParams }: { searchParams: Promise
           itens={((itens ?? []) as any[]).sort((a, b) => a.pedidos.entrega_em.localeCompare(b.pedidos.entrega_em) || a.pedidos.numero - b.pedidos.numero)}
           aux={Object.fromEntries(Object.entries(cfg ?? {}).map(([k, v]) => [k, Number(v)]))}
           auxiliares={auxiliares ?? []}
-          estoque={Object.fromEntries((saldos ?? []).map((s) => [s.insumo_id, Number(s.quantidade)]))}
+          estoque={estoqueLote}
           hoje={hojeSP()}
         />
       )}

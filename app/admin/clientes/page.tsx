@@ -42,7 +42,7 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
       <div className="cabecalho">
         <div>
           <h1>Clientes</h1>
-          <p className="suave" style={{ margin: 0 }}>{todos?.length ?? 0} contatos · {comAceite} {comAceite === 1 ? "aceita" : "aceitam"} receber novidades · sumido após {cfg?.dias_sumido ?? 45} dias sem pedir</p>
+          <p className="suave" style={{ margin: 0 }}>{todos?.length ?? 0} {(todos?.length ?? 0) === 1 ? "contato" : "contatos"} · {comAceite} {comAceite === 1 ? "aceita" : "aceitam"} receber novidades · sumido após {cfg?.dias_sumido ?? 45} dias sem pedir</p>
         </div>
         <div className="acoes">
           <a className="botao contorno" href={`/admin/clientes/exportar${qs({})}`}>Exportar planilha</a>

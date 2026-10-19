@@ -50,9 +50,11 @@ export async function salvarEmbalagem(_: EstadoForm, d: FormData): Promise<Estad
   if (!(conteudo > 0)) return { erro: "Informe o conteúdo da embalagem." };
   if (!["g", "kg", "ml", "l", "un"].includes(unidade)) return { erro: "Escolha a unidade." };
   if (!nome) nome = `${unidade === "un" ? "Pacote" : "Embalagem"} ${String(conteudo).replace(".", ",")} ${unidade === "l" ? "L" : unidade}`;
-  const { error } = await supabase.from("insumo_embalagens").insert({ insumo_id: String(d.get("insumo_id")), nome, conteudo, unidade });
+  const insumoId = String(d.get("insumo_id"));
+  const marcaId = String(d.get("marca_id") ?? "") || null;
+  const { error } = await supabase.from("insumo_embalagens").insert({ insumo_id: insumoId, marca_id: marcaId, nome, conteudo, unidade });
   if (error) return { erro: error.code === "23505" ? "Essa embalagem já está cadastrada." : mensagemDoBanco(error) };
-  revalidatePath("/admin/insumos");
+  revalidatePath("/admin/insumos", "layout");
   return { ok: "Embalagem adicionada." };
 }
 
@@ -60,28 +62,70 @@ export async function removerEmbalagem(_: EstadoForm, d: FormData): Promise<Esta
   const { supabase } = await exigirAdmin();
   const { error } = await supabase.from("insumo_embalagens").delete().eq("id", String(d.get("id")));
   if (error) return { erro: mensagemDoBanco(error) };
-  revalidatePath("/admin/insumos");
+  revalidatePath("/admin/insumos", "layout");
   return { ok: "Embalagem removida." };
 }
 
 const CAMPOS_NUTRI = ["kcal", "carboidratos_g", "acucares_totais_g", "acucares_adic_g", "proteinas_g", "gorduras_g", "saturadas_g", "trans_g", "fibras_g", "sodio_mg"];
 
-export async function salvarNutricaoInsumo(_: EstadoForm, d: FormData): Promise<EstadoForm> {
-  const { supabase } = await exigirAdmin();
+function lerNutricao(d: FormData): Record<string, number | string | null> | string {
   const linha: Record<string, number | string | null> = {};
   const vazios = CAMPOS_NUTRI.filter((c) => String(d.get(c) ?? "").trim() === "");
-  if (vazios.length && vazios.length < CAMPOS_NUTRI.length) return { erro: "Preencha todos os campos (use 0 quando não tiver) ou deixe todos vazios." };
+  if (vazios.length && vazios.length < CAMPOS_NUTRI.length) return "Preencha todos os campos (use 0 quando não tiver) ou deixe todos vazios.";
   for (const c of CAMPOS_NUTRI) {
     const t = String(d.get(c) ?? "").trim().replace(",", ".");
     if (t === "") { linha[`nutri_${c}`] = null; continue; }
     const v = Number(t);
-    if (!Number.isFinite(v) || v < 0) return { erro: "Use apenas números positivos." };
+    if (!Number.isFinite(v) || v < 0) return "Use apenas números positivos.";
     linha[`nutri_${c}`] = v;
   }
   linha.nutri_fonte = String(d.get("fonte") ?? "").trim() || null;
-  const { error } = await supabase.from("insumos").update(linha).eq("id", String(d.get("id")));
+  return linha;
+}
+
+export async function salvarNutricaoInsumo(_: EstadoForm, d: FormData): Promise<EstadoForm> {
+  const { supabase } = await exigirAdmin();
+  const linha = lerNutricao(d);
+  if (typeof linha === "string") return { erro: linha };
+  const marca = String(d.get("marca_id") ?? "");
+  const { error } = marca
+    ? await supabase.from("marcas").update(linha).eq("id", marca)
+    : await supabase.from("insumos").update(linha).eq("id", String(d.get("id")));
   if (error) return { erro: mensagemDoBanco(error) };
-  revalidatePath("/admin/insumos");
+  revalidatePath("/admin/insumos", "layout");
   revalidatePath("/admin/receitas", "layout");
-  return { ok: "Tabela nutricional do insumo salva." };
+  return { ok: marca ? "Tabela nutricional da marca salva." : "Tabela genérica do insumo salva." };
+}
+
+export async function salvarMarca(_: EstadoForm, d: FormData): Promise<EstadoForm> {
+  const { supabase } = await exigirAdmin();
+  const id = String(d.get("id") ?? "");
+  const insumo = String(d.get("insumo_id"));
+  const nome = String(d.get("nome") ?? "").trim();
+  if (!nome) return { erro: "Informe o nome da marca." };
+  const linha = {
+    nome,
+    nome_rotulo: String(d.get("nome_rotulo") ?? "").trim() || null,
+    notas: String(d.get("notas") ?? "").trim() || null,
+    ...(id ? { ativo: d.get("ativo") === "on" } : {}),
+  };
+  if (id) {
+    const { data, error } = await supabase.from("marcas").update(linha).eq("id", id).eq("versao", Number(d.get("versao"))).select("id");
+    if (error) return { erro: error.code === "23505" ? "Já existe uma marca com esse nome neste insumo." : mensagemDoBanco(error) };
+    if (!data?.length) return { erro: CONFLITO };
+  } else {
+    const { data, error } = await supabase.from("marcas").insert({ ...linha, insumo_id: insumo }).select("id").single();
+    if (error) return { erro: error.code === "23505" ? "Já existe uma marca com esse nome neste insumo." : mensagemDoBanco(error) };
+    if (d.get("em_uso") === "on") await supabase.rpc("definir_marca_em_uso", { p_marca_id: data.id });
+  }
+  revalidatePath(`/admin/insumos/${insumo}`);
+  return { ok: id ? "Marca salva." : "Marca cadastrada." };
+}
+
+export async function usarMarca(_: EstadoForm, d: FormData): Promise<EstadoForm> {
+  const { supabase } = await exigirAdmin();
+  const { error } = await supabase.rpc("definir_marca_em_uso", { p_marca_id: String(d.get("id")) });
+  if (error) return { erro: mensagemDoBanco(error) };
+  revalidatePath(`/admin/insumos/${String(d.get("insumo_id"))}`);
+  return { ok: "Marca em uso atualizada. Os próximos lotes começam com ela." };
 }

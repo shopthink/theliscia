@@ -15,11 +15,11 @@ export default async function Lote({ params, searchParams }: { params: Promise<{
   const { supabase } = await exigirAdmin();
   const [{ data: l }, { data: abertaOutra }, { data: insumos }, { data: saldos }] = await Promise.all([
     supabase.from("lotes")
-      .select("*, receitas(nome, produz:insumos!receitas_produz_insumo_id_fkey(nome, unidade)), receita_versoes(numero), lote_sessoes(id, etapa, inicio, fim, manual), lote_esperas(id, tipo, inicio, fim, alvo_min, lembrete_min, lembrete_feito_em), lote_consumos(insumo_id, quantidade_prevista, quantidade_real, custo_unitario_centavos, custo_total_centavos, insumos(nome, unidade)), pedido_itens(id, quantidade, nome, pedidos(id, numero, cliente_nome, entrega_em))")
+      .select("*, receitas(nome, produz:insumos!receitas_produz_insumo_id_fkey(nome, unidade)), receita_versoes(numero), lote_sessoes(id, etapa, inicio, fim, manual), lote_esperas(id, tipo, inicio, fim, alvo_min, lembrete_min, lembrete_feito_em), lote_consumos(insumo_id, marca_id, quantidade_prevista, quantidade_real, custo_unitario_centavos, custo_total_centavos, insumos(nome, unidade), marcas(nome)), pedido_itens(id, quantidade, nome, pedidos(id, numero, cliente_nome, entrega_em))")
       .eq("id", id).maybeSingle(),
     supabase.from("lote_sessoes").select("lote_id, etapa, lotes(numero)").is("fim", null).neq("lote_id", id).maybeSingle(),
-    supabase.from("insumos").select("id, nome, unidade").eq("ativo", true).order("nome"),
-    supabase.from("estoque_saldos").select("insumo_id, quantidade"),
+    supabase.from("insumos").select("id, nome, unidade, marcas(id, nome, em_uso, ativo)").eq("ativo", true).order("nome"),
+    supabase.from("estoque_saldos").select("insumo_id, marca_id, quantidade"),
   ]);
   if (!l) notFound();
   const [rot, cls] = STATUS_LOTE[l.status];
@@ -79,13 +79,13 @@ export default async function Lote({ params, searchParams }: { params: Promise<{
         sessoes={((l.lote_sessoes as any[]) ?? []).sort((a, b) => a.inicio.localeCompare(b.inicio))}
         esperas={((l.lote_esperas as any[]) ?? []).sort((a, b) => a.inicio.localeCompare(b.inicio))}
         consumos={((l.lote_consumos as any[]) ?? []).map((c) => ({
-          insumo_id: c.insumo_id, nome: c.insumos.nome, unidade: c.insumos.unidade,
+          insumo_id: c.insumo_id, nome: c.insumos.nome, unidade: c.insumos.unidade, marca_id: c.marca_id ?? null, marca_nome: c.marcas?.nome ?? null,
           prevista: Number(c.quantidade_prevista), real: Number(c.quantidade_real),
           custoUnit: c.custo_unitario_centavos != null ? Number(c.custo_unitario_centavos) : null,
           custoTotal: c.custo_total_centavos != null ? Number(c.custo_total_centavos) : null,
         })).sort((a, b) => b.prevista - a.prevista)}
-        insumos={insumos ?? []}
-        estoque={Object.fromEntries((saldos ?? []).map((s) => [s.insumo_id, Number(s.quantidade)]))}
+        insumos={(insumos ?? []).map((i: any) => ({ ...i, marcas: (i.marcas ?? []).filter((m: any) => m.ativo) }))}
+        estoque={Object.fromEntries((saldos ?? []).map((s) => [`${s.insumo_id}|${s.marca_id ?? ""}`, Number(s.quantidade)]))}
         abertaOutra={abertaOutra ? { etapa: abertaOutra.etapa, numero: (abertaOutra as any).lotes.numero, lote_id: abertaOutra.lote_id } : null}
       />
 

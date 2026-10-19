@@ -8,14 +8,21 @@ import { Rotulo } from "./Rotulo";
 
 export const metadata = { title: "Receita" };
 
-export default async function Receita({ params }: { params: Promise<{ id: string }> }) {
+export default async function Receita({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ marcas?: string }> }) {
   const { id } = await params;
+  const { marcas: marcasParam } = await searchParams;
+  let combinacaoInicial: Record<string, string | null> | null = null;
+  try { combinacaoInicial = marcasParam ? JSON.parse(marcasParam) : null; } catch { combinacaoInicial = null; }
   const { supabase } = await exigirAdmin();
   const [{ data: r }, { data: insumos }] = await Promise.all([
-    supabase.from("receitas").select("id, nome, tipo, versao_atual_id, rotulo_nome, rotulo_ingredientes, rotulo_alergenicos, rotulo_conservacao, rotulo_preparo, validade_dias, peso_assado_g, porcao_g, porcao_medida, nutricao, nutricao_versao_id, nutricao_validada_em, produz:insumos!receitas_produz_insumo_id_fkey(nome, unidade), receita_versoes!receita_versoes_receita_id_fkey(id, numero, peso_bolinha_g, massa_base_g, rendimento, observacoes, criado_em, receita_versao_ingredientes(insumo_id, quantidade, densidade_g, insumos(nome, unidade)))").eq("id", id).maybeSingle(),
+    supabase.from("receitas").select("id, nome, tipo, versao_atual_id, rotulo_nome, rotulo_alergenicos, rotulo_conservacao, rotulo_preparo, validade_dias, peso_assado_g, porcao_g, porcao_medida, produz:insumos!receitas_produz_insumo_id_fkey(nome, unidade), receita_versoes!receita_versoes_receita_id_fkey(id, numero, peso_bolinha_g, massa_base_g, rendimento, observacoes, criado_em, receita_versao_ingredientes(insumo_id, quantidade, densidade_g, insumos(nome, unidade)))").eq("id", id).maybeSingle(),
     supabase.from("insumos").select("id, nome, unidade, categoria, nutri_kcal, nutri_carboidratos_g, nutri_acucares_totais_g, nutri_acucares_adic_g, nutri_proteinas_g, nutri_gorduras_g, nutri_saturadas_g, nutri_trans_g, nutri_fibras_g, nutri_sodio_mg").eq("ativo", true).order("nome"),
   ]);
   if (!r) notFound();
+  const [{ data: marcas }, { data: tabelas }] = await Promise.all([
+    supabase.from("marcas").select("id, insumo_id, nome, nome_rotulo, em_uso, nutri_kcal, nutri_carboidratos_g, nutri_acucares_totais_g, nutri_acucares_adic_g, nutri_proteinas_g, nutri_gorduras_g, nutri_saturadas_g, nutri_trans_g, nutri_fibras_g, nutri_sodio_mg").eq("ativo", true).order("nome"),
+    supabase.from("receita_tabelas").select("id, marcas, chave, nutricao, ingredientes, validada_em, receita_versao_id").eq("receita_id", id).order("validada_em", { ascending: false }),
+  ]);
   const versoes = [...(r.receita_versoes as any[])].sort((a, b) => b.numero - a.numero);
   const atual = versoes.find((v) => v.id === r.versao_atual_id);
   const ings = (atual?.receita_versao_ingredientes ?? []).map((i: any) => ({
@@ -58,14 +65,16 @@ export default async function Receita({ params }: { params: Promise<{ id: string
       {atual && !preparo && (
         <Rotulo
           r={{
-            id: r.id, rotulo_nome: (r as any).rotulo_nome, rotulo_ingredientes: (r as any).rotulo_ingredientes, rotulo_alergenicos: (r as any).rotulo_alergenicos,
+            id: r.id, rotulo_nome: (r as any).rotulo_nome, rotulo_alergenicos: (r as any).rotulo_alergenicos,
             rotulo_conservacao: (r as any).rotulo_conservacao, rotulo_preparo: (r as any).rotulo_preparo, validade_dias: (r as any).validade_dias,
             peso_assado_g: (r as any).peso_assado_g != null ? Number((r as any).peso_assado_g) : null,
             porcao_g: (r as any).porcao_g != null ? Number((r as any).porcao_g) : null, porcao_medida: (r as any).porcao_medida,
-            nutricao: (r as any).nutricao, nutricao_validada_em: (r as any).nutricao_validada_em,
-            nutricao_desatualizada: !!(r as any).nutricao_validada_em && (r as any).nutricao_versao_id !== r.versao_atual_id,
           }}
-          ingredientes={ings.map((i: any) => ({ insumo_id: i.insumo_id, quantidade: i.quantidade }))}
+          ingredientes={ings.map((i: any) => ({ insumo_id: i.insumo_id, nome: i.nome, quantidade: i.quantidade, densidade_g: i.densidade_g }))}
+          marcas={(marcas ?? []).filter((m) => ings.some((i: any) => i.insumo_id === m.insumo_id)).map((m: any) =>
+            Object.fromEntries(Object.entries(m).map(([k, v]) => [k, k.startsWith("nutri_") && v != null ? Number(v) : v]))) as any}
+          tabelas={(tabelas ?? []).map((t: any) => ({ ...t, versao_atual: t.receita_versao_id === r.versao_atual_id }))}
+          combinacaoInicial={combinacaoInicial}
           insumos={(insumos ?? []).map((i: any) => Object.fromEntries(Object.entries(i).map(([k, v]) => [k, k.startsWith("nutri_") && v != null ? Number(v) : v]))) as any}
           massaBaseG={Number(atual.massa_base_g)}
           pesoBolinhaG={Number(atual.peso_bolinha_g)}

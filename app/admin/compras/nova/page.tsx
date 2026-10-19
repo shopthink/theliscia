@@ -7,7 +7,7 @@ export const metadata = { title: "Nova compra" };
 export default async function NovaCompra() {
   const { supabase } = await exigirAdmin();
   const [{ data: insumos }, { data: fornecedores }, { data: cfg }] = await Promise.all([
-    supabase.from("insumos").select("id, nome, unidade, insumo_embalagens(id, nome, conteudo, unidade)").eq("ativo", true).order("nome"),
+    supabase.from("insumos").select("id, nome, unidade, insumo_embalagens(id, nome, conteudo, unidade, marca_id, ativo), marcas(id, nome, em_uso, ativo)").eq("ativo", true).order("nome"),
     supabase.from("fornecedores").select("id, nome").eq("ativo", true).order("nome"),
     supabase.from("configuracoes").select("valor_hora_centavos").single(),
   ]);
@@ -19,7 +19,7 @@ export default async function NovaCompra() {
           <h1>Nova compra</h1>
         </div>
       </div>
-      <FormCompra insumos={(insumos ?? []).map((i: any) => ({ ...i, embalagens: (i.insumo_embalagens ?? []).map((e: any) => ({ ...e, conteudo: Number(e.conteudo) })) }))} fornecedores={fornecedores ?? []} valorHora={cfg?.valor_hora_centavos ?? 0} />
+      <FormCompra insumos={(insumos ?? []).map((i: any) => ({ ...i, embalagens: (i.insumo_embalagens ?? []).filter((e: any) => e.ativo).map((e: any) => ({ ...e, conteudo: Number(e.conteudo) })) }))} fornecedores={fornecedores ?? []} valorHora={cfg?.valor_hora_centavos ?? 0} />
     </>
   );
 }

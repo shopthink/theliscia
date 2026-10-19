@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { exigirAdmin } from "@/lib/auth";
 import { FormAcao } from "@/components/FormAcao";
@@ -104,11 +105,17 @@ async function ListaCompras({ ver }: { ver?: string }) {
 async function Estoque() {
   const { supabase } = await exigirAdmin();
   const [{ data: insumos }, { data: saldos }, { data: movs }] = await Promise.all([
-    supabase.from("insumos").select("id, nome, unidade, categoria, preco_ref_centavos, ativo").order("categoria").order("nome"),
-    supabase.from("estoque_saldos").select("insumo_id, quantidade, valor_centavos"),
-    supabase.from("estoque_movimentos").select("id, tipo, quantidade, valor_centavos, data, motivo, criado_em, insumos(nome, unidade), compras(numero)").order("criado_em", { ascending: false }).limit(40),
+    supabase.from("insumos").select("id, nome, unidade, categoria, preco_ref_centavos, ativo, marcas(id, nome, em_uso, ativo)").order("categoria").order("nome"),
+    supabase.from("estoque_saldos").select("insumo_id, marca_id, quantidade, valor_centavos, marcas(nome)"),
+    supabase.from("estoque_movimentos").select("id, tipo, quantidade, valor_centavos, data, motivo, criado_em, insumos(nome, unidade), marcas(nome), compras(numero)").order("criado_em", { ascending: false }).limit(40),
   ]);
-  const s = new Map((saldos ?? []).map((x) => [x.insumo_id, x]));
+  // Soma por insumo; o detalhe por marca aparece embaixo de cada um
+  const s = new Map<string, { quantidade: number; valor_centavos: number }>();
+  for (const x of saldos ?? []) {
+    const a = s.get(x.insumo_id) ?? { quantidade: 0, valor_centavos: 0 };
+    s.set(x.insumo_id, { quantidade: a.quantidade + Number(x.quantidade), valor_centavos: a.valor_centavos + Number(x.valor_centavos) });
+  }
+  const porMarca = (insumoId: string) => (saldos ?? []).filter((x: any) => x.insumo_id === insumoId && Number(x.quantidade) !== 0);
   const valorTotal = (saldos ?? []).reduce((t, x) => t + Number(x.valor_centavos), 0);
   const TIPO: Record<string, string> = { compra: "Compra", producao: "Produção", ajuste: "Ajuste", perda: "Perda", estorno: "Estorno" };
 
@@ -134,15 +141,30 @@ async function Estoque() {
                 const [rot, f] = POR[i.unidade];
                 const medio = q > 0 ? (v / q) * f : null;
                 const ref = i.preco_ref_centavos != null ? Number(i.preco_ref_centavos) * f : null;
+                const detalhe = porMarca(i.id);
+                const mostrarDetalhe = detalhe.length > 1 || detalhe.some((x: any) => x.marca_id);
                 return (
-                  <tr key={i.id}>
-                    <td>{i.nome}</td>
-                    <td className="dir num" style={q < 0 ? { color: "var(--erro)" } : undefined}>{qtd(q, i.unidade)}</td>
-                    <td className="dir num">
-                      {medio != null ? `${formatarBRL(Math.round(medio))}/${rot}` : ref != null ? <span className="suave">{formatarBRL(Math.round(ref))}/{rot} (estimativa)</span> : <span className="suave">sem compra</span>}
-                    </td>
-                    <td className="dir num">{formatarBRL(Math.round(v))}</td>
-                  </tr>
+                  <Fragment key={i.id}>
+                    <tr>
+                      <td><Link href={`/admin/insumos/${i.id}`} style={{ color: "inherit" }}>{i.nome}</Link></td>
+                      <td className="dir num" style={q < 0 ? { color: "var(--erro)" } : undefined}>{qtd(q, i.unidade)}</td>
+                      <td className="dir num">
+                        {medio != null ? `${formatarBRL(Math.round(medio))}/${rot}` : ref != null ? <span className="suave">{formatarBRL(Math.round(ref))}/{rot} (estimativa)</span> : <span className="suave">sem compra</span>}
+                      </td>
+                      <td className="dir num">{formatarBRL(Math.round(v))}</td>
+                    </tr>
+                    {mostrarDetalhe && detalhe.map((x: any) => {
+                      const mq = Number(x.quantidade), mv = Number(x.valor_centavos);
+                      return (
+                        <tr key={`${i.id}-${x.marca_id ?? "sem"}`} className="suave" style={{ fontSize: "0.88rem" }}>
+                          <td style={{ paddingLeft: "1.6rem" }}>{x.marcas?.nome ?? "sem marca"}</td>
+                          <td className="dir num" style={mq < 0 ? { color: "var(--erro)" } : undefined}>{qtd(mq, i.unidade)}</td>
+                          <td className="dir num">{mq > 0 ? `${formatarBRL(Math.round((mv / mq) * f))}/${rot}` : "—"}</td>
+                          <td className="dir num">{formatarBRL(Math.round(mv))}</td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -156,10 +178,15 @@ async function Estoque() {
         <FormAcao acao={registrarAjuste} botao="Registrar" limparAoSalvar>
           <div className="grade">
             <div className="campo">
-              <label htmlFor="insumo_id">Insumo</label>
-              <select id="insumo_id" name="insumo_id" required defaultValue="">
+              <label htmlFor="insumo_id">Insumo e marca</label>
+              <select id="insumo_id" name="insumo_marca" required defaultValue="">
                 <option value="" disabled>Escolha…</option>
-                {(insumos ?? []).filter((i) => i.ativo).map((i: any) => <option key={i.id} value={i.id}>{i.nome} ({i.unidade})</option>)}
+                {(insumos ?? []).filter((i) => i.ativo).map((i: any) => (
+                  <optgroup key={i.id} label={`${i.nome} (${i.unidade})`}>
+                    {(i.marcas ?? []).filter((m: any) => m.ativo).map((m: any) => <option key={m.id} value={`${i.id}|${m.id}`}>{i.nome} · {m.nome}</option>)}
+                    <option value={`${i.id}|`}>{i.nome} · sem marca</option>
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div className="campo">
@@ -190,7 +217,7 @@ async function Estoque() {
                   <tr key={m.id}>
                     <td className="num">{formatarData(m.data)}<div className="suave" style={{ fontSize: "0.78rem" }}>{formatarDataHora(m.criado_em)}</div></td>
                     <td>{TIPO[m.tipo] ?? m.tipo}</td>
-                    <td>{m.insumos?.nome}</td>
+                    <td>{m.insumos?.nome}{m.marcas?.nome && <span className="suave"> · {m.marcas.nome}</span>}</td>
                     <td className="dir num">{Number(m.quantidade) > 0 ? "+" : ""}{qtd(Number(m.quantidade), m.insumos?.unidade)}</td>
                     <td className="dir num">{formatarBRL(Math.round(Number(m.valor_centavos)))}</td>
                     <td>{m.compras ? `Compra C-${String(m.compras.numero).padStart(4, "0")}` : ""}{m.motivo ? `${m.compras ? " · " : ""}${m.motivo}` : ""}</td>
@@ -214,7 +241,7 @@ async function ListaDeCompras() {
     supabase.from("configuracoes").select("semola_g_por_base, saco_vacuo_por_base, etiqueta_por_base, molho_g_por_base, sacola_por_pedido").single(),
     supabase.from("insumos").select("id, nome, unidade, uso_auxiliar, entra_lista_compras, ativo").order("nome"),
     supabase.from("estoque_saldos").select("insumo_id, quantidade, valor_centavos"),
-    supabase.from("insumo_embalagens").select("id, insumo_id, nome, quantidade_base").eq("ativo", true),
+    supabase.from("insumo_embalagens").select("id, insumo_id, nome, quantidade_base, marca_id, marcas(nome, em_uso)").eq("ativo", true),
     supabase.from("compra_itens")
       .select("insumo_id, pacotes, conteudo, unidade_conteudo, quantidade_base, custo_final_centavos, compras!inner(data, cancelada, numero)")
       .eq("compras.cancelada", false)
@@ -229,13 +256,24 @@ async function ListaDeCompras() {
     const atual = ultimaPorPacote.get(chave);
     if (!atual || it.compras.data > atual.data) ultimaPorPacote.set(chave, { preco: Math.round(it.custo_final_centavos / Number(it.pacotes)), data: it.compras.data });
   }
-  const medio = new Map((saldos ?? []).filter((x) => Number(x.quantidade) > 0).map((x) => [x.insumo_id, Number(x.valor_centavos) / Number(x.quantidade)]));
-  const embalagensDe = (insumoId: string) => (embs ?? []).filter((e) => e.insumo_id === insumoId).map((e): Embalagem & { estimado: boolean } => {
+  // Estoque e custo somando as marcas
+  const totais = new Map<string, { q: number; v: number }>();
+  for (const x of saldos ?? []) {
+    const a = totais.get(x.insumo_id) ?? { q: 0, v: 0 };
+    totais.set(x.insumo_id, { q: a.q + Number(x.quantidade), v: a.v + Number(x.valor_centavos) });
+  }
+  const medio = new Map([...totais].filter(([, t]) => t.q > 0).map(([k, t]) => [k, t.v / t.q]));
+  // Embalagens da marca em uso (e as genéricas); sem marca em uso, todas
+  const embalagensDe = (insumoId: string) => {
+    const todas = (embs ?? []).filter((e: any) => e.insumo_id === insumoId);
+    const daEmUso = todas.filter((e: any) => !e.marca_id || e.marcas?.em_uso);
+    return (daEmUso.length ? daEmUso : todas).map((e: any): Embalagem & { estimado: boolean } => {
     const qb = Number(e.quantidade_base);
     const real = ultimaPorPacote.get(`${insumoId}|${Math.round(qb * 1000)}`);
     const m = medio.get(insumoId);
-    return { id: e.id, nome: e.nome, quantidade_base: qb, precoCentavos: real?.preco ?? (m != null ? Math.round(m * qb) : null), estimado: !real };
+    return { id: e.id, nome: e.marcas?.nome ? `${e.marcas.nome} ${e.nome}` : e.nome, quantidade_base: qb, precoCentavos: real?.preco ?? (m != null ? Math.round(m * qb) : null), estimado: !real };
   });
+  };
   const ped = (pedidos ?? []).map((p: any) => ({
     itens: (p.pedido_itens ?? []).map((i: any) => ({
       quantidade: i.quantidade,
@@ -245,7 +283,7 @@ async function ListaDeCompras() {
     })),
   }));
   const aux = Object.fromEntries(Object.entries(cfg ?? {}).map(([k, v]) => [k, Number(v)])) as any;
-  const { linhas, bases } = montarLista(ped, aux, insumos ?? [], Object.fromEntries((saldos ?? []).map((s) => [s.insumo_id, Number(s.quantidade)])));
+  const { linhas, bases } = montarLista(ped, aux, insumos ?? [], Object.fromEntries([...totais].map(([k, t]) => [k, t.q])));
   const comprar = linhas.filter((l) => l.comprar > 0);
 
   return (

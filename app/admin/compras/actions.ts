@@ -6,6 +6,9 @@ import { mensagemDoBanco, type EstadoForm } from "@/lib/erros";
 
 export interface ItemCompraForm {
   insumo_id: string;
+  marca_id?: string;
+  marca_nome?: string;
+  usar_marca?: boolean;
   descricao_original?: string;
   pacotes: number;
   conteudo: number;
@@ -37,7 +40,7 @@ export async function salvarCompra(compra: CompraForm): Promise<{ erro?: string;
   const { data, error } = await supabase.rpc("salvar_compra", { p: compra });
   if (error) return { erro: mensagemDoBanco(error) };
   revalidatePath("/admin/compras");
-  revalidatePath("/admin/insumos");
+  revalidatePath("/admin/insumos", "layout");
   return { id: data as string };
 }
 
@@ -58,8 +61,11 @@ export async function registrarAjuste(_: EstadoForm, d: FormData): Promise<Estad
   const qtd = Number(String(d.get("quantidade") ?? "").replace(",", "."));
   if (!Number.isFinite(qtd) || qtd === 0) return { erro: "Informe a quantidade." };
   const quantidade = tipo === "perda" ? -Math.abs(qtd) : qtd;
+  const [insumoId, marcaId] = String(d.get("insumo_marca") ?? "").split("|");
+  if (!insumoId) return { erro: "Escolha o insumo e a marca." };
   const { error } = await supabase.rpc("registrar_ajuste_estoque", {
-    p_insumo_id: String(d.get("insumo_id")),
+    p_marca_id: marcaId || null,
+    p_insumo_id: insumoId,
     p_quantidade: quantidade,
     p_tipo: tipo,
     p_motivo: String(d.get("motivo") ?? ""),
@@ -67,7 +73,7 @@ export async function registrarAjuste(_: EstadoForm, d: FormData): Promise<Estad
   });
   if (error) return { erro: mensagemDoBanco(error) };
   revalidatePath("/admin/compras");
-  revalidatePath("/admin/insumos");
+  revalidatePath("/admin/insumos", "layout");
   return { ok: tipo === "perda" ? "Perda registrada." : "Ajuste registrado." };
 }
 

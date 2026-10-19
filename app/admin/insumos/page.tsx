@@ -1,7 +1,7 @@
 import { exigirAdmin } from "@/lib/auth";
 import { FormAcao } from "@/components/FormAcao";
-import { removerEmbalagem, salvarEmbalagem, salvarInsumo, salvarNutricaoInsumo } from "./actions";
-import { NUTRIENTES } from "@/lib/nutricao";
+import Link from "next/link";
+import { salvarInsumo } from "./actions";
 
 export const metadata = { title: "Insumos" };
 
@@ -14,14 +14,14 @@ const POR: Record<string, string> = { g: "por kg", ml: "por litro", un: "por uni
 
 export default async function Insumos() {
   const { supabase } = await exigirAdmin();
-  const { data: insumos } = await supabase.from("insumos").select("*, insumo_embalagens(id, nome, conteudo, unidade)").order("categoria").order("nome");
+  const { data: insumos } = await supabase.from("insumos").select("*, insumo_embalagens(id), marcas(id, nome, em_uso, ativo)").order("categoria").order("nome");
   return (
     <>
       <div className="cabecalho">
         <div>
           <h1>Insumos</h1>
           <p className="suave" style={{ margin: 0 }}>
-            Preço de referência é a sua estimativa, usada enquanto não houver compras cadastradas. Não é cotação atual.
+            Cada insumo é o ingrediente genérico da receita. As marcas que você compra, com tabela nutricional, embalagens, preço pago e perdas, ficam dentro de cada um.
           </p>
         </div>
       </div>
@@ -33,8 +33,15 @@ export default async function Insumos() {
             <input type="hidden" name="unidade" value={i.unidade} />
             <Campos i={i} />
           </FormAcao>
-          <Embalagens i={i} />
-          {i.categoria !== "embalagem" && <Nutricao i={i} />}
+          <div className="acoes" style={{ justifyContent: "space-between", borderTop: "1px solid var(--creme-2)", marginTop: "0.6rem", paddingTop: "0.7rem" }}>
+            <span className="suave" style={{ fontSize: "0.9rem" }}>
+              {(i.marcas ?? []).filter((m: any) => m.ativo).length
+                ? <>Marcas: {(i.marcas ?? []).filter((m: any) => m.ativo).map((m: any) => m.em_uso ? `${m.nome} (em uso)` : m.nome).join(", ")}</>
+                : "Nenhuma marca cadastrada"}
+              {" · "}{(i.insumo_embalagens ?? []).length} {(i.insumo_embalagens ?? []).length === 1 ? "embalagem" : "embalagens"}
+            </span>
+            <Link className="botao contorno pequeno" href={`/admin/insumos/${i.id}`}>Marcas, estoque e comparativo →</Link>
+          </div>
         </div>
       ))}
       <div className="cartao">
@@ -86,66 +93,3 @@ function Campos({ i, novo }: { i: any; novo?: boolean }) {
   );
 }
 
-const UN_EMB: Record<string, { v: string; r: string }[]> = {
-  g: [{ v: "kg", r: "kg" }, { v: "g", r: "g" }],
-  ml: [{ v: "l", r: "L" }, { v: "ml", r: "ml" }],
-  un: [{ v: "un", r: "unidades" }],
-};
-
-function Embalagens({ i }: { i: any }) {
-  const lista = [...(i.insumo_embalagens ?? [])].sort((a: any, b: any) => Number(a.conteudo) - Number(b.conteudo));
-  return (
-    <div style={{ borderTop: "1px solid var(--creme-2)", marginTop: "0.9rem", paddingTop: "0.9rem" }}>
-      <div className="caixa-alta suave" style={{ marginBottom: "0.4rem" }}>Embalagens em que você compra</div>
-      {!lista.length && <p className="suave" style={{ fontSize: "0.9rem" }}>Nenhuma ainda. Ex.: pacote 5 kg, lata 350 ml, caixa com 100 un.</p>}
-      <div className="acoes" style={{ marginBottom: "0.6rem" }}>
-        {lista.map((e: any) => (
-          <FormAcao key={e.id} acao={removerEmbalagem} botao={`${e.nome}  ×`} classeBotao="contorno pequeno" confirmar={`Remover ${e.nome}?`}>
-            <input type="hidden" name="id" value={e.id} />
-          </FormAcao>
-        ))}
-      </div>
-      <FormAcao acao={salvarEmbalagem} botao="Adicionar embalagem" classeBotao="contorno pequeno" limparAoSalvar>
-        <input type="hidden" name="insumo_id" value={i.id} />
-        <div className="grade" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
-          <div className="campo"><label htmlFor={`en-${i.id}`}>Nome (opcional)</label><input id={`en-${i.id}`} name="nome" placeholder="Ex.: Lata 400 g" /></div>
-          <div className="campo"><label htmlFor={`ec-${i.id}`}>Conteúdo</label><input id={`ec-${i.id}`} name="conteudo" inputMode="decimal" required placeholder="Ex.: 5" /></div>
-          <div className="campo">
-            <label htmlFor={`eu-${i.id}`}>Unidade</label>
-            <select id={`eu-${i.id}`} name="unidade" defaultValue={UN_EMB[i.unidade][0].v}>
-              {UN_EMB[i.unidade].map((u) => <option key={u.v} value={u.v}>{u.r}</option>)}
-            </select>
-          </div>
-        </div>
-      </FormAcao>
-    </div>
-  );
-}
-
-function Nutricao({ i }: { i: any }) {
-  const por = i.unidade === "ml" ? "100 ml" : i.unidade === "un" ? "unidade" : "100 g";
-  const tem = i.nutri_kcal != null;
-  return (
-    <details style={{ borderTop: "1px solid var(--creme-2)", marginTop: "0.9rem", paddingTop: "0.9rem" }}>
-      <summary className="caixa-alta suave" style={{ cursor: "pointer" }}>
-        Tabela nutricional (por {por}) {tem ? <span className="selo ok">preenchida</span> : <span className="selo alerta">sem dados</span>}
-      </summary>
-      <FormAcao acao={salvarNutricaoInsumo} botao="Salvar tabela do insumo" classeBotao="contorno pequeno">
-        <input type="hidden" name="id" value={i.id} />
-        <div className="grade" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", marginTop: "0.6rem" }}>
-          {NUTRIENTES.map((n) => (
-            <div className="campo" key={n.chave}>
-              <label htmlFor={`${n.chave}-${i.id}`}>{n.rotulo} ({n.unidade})</label>
-              <input id={`${n.chave}-${i.id}`} name={n.chave} inputMode="decimal"
-                defaultValue={i[`nutri_${n.chave}`] != null ? String(Number(i[`nutri_${n.chave}`])).replace(".", ",") : ""} />
-            </div>
-          ))}
-        </div>
-        <div className="campo"><label htmlFor={`fonte-${i.id}`}>Fonte dos dados</label>
-          <input id={`fonte-${i.id}`} name="fonte" defaultValue={i.nutri_fonte ?? ""} placeholder="Ex.: rótulo da farinha marca X" />
-          <span className="ajuda">Prefira o rótulo do produto que você compra. Valores pré-preenchidos são referências aproximadas.</span>
-        </div>
-      </FormAcao>
-    </details>
-  );
-}

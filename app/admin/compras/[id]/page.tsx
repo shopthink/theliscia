@@ -17,7 +17,7 @@ export default async function Compra({ params, searchParams }: { params: Promise
   const { supabase } = await exigirAdmin();
   const { data: c } = await supabase
     .from("compras")
-    .select("*, fornecedores(nome), compra_itens(*, insumos(nome, unidade))")
+    .select("*, fornecedores(nome), compra_itens(*, insumos(nome, unidade), marcas(nome))")
     .eq("id", id)
     .maybeSingle();
   if (!c) notFound();
@@ -26,13 +26,13 @@ export default async function Compra({ params, searchParams }: { params: Promise
 
   if (sp.editar && !c.cancelada) {
     const [{ data: insumos }, { data: fornecedores }] = await Promise.all([
-      supabase.from("insumos").select("id, nome, unidade, insumo_embalagens(id, nome, conteudo, unidade)").order("nome"),
+      supabase.from("insumos").select("id, nome, unidade, insumo_embalagens(id, nome, conteudo, unidade, marca_id, ativo), marcas(id, nome, em_uso, ativo)").order("nome"),
       supabase.from("fornecedores").select("id, nome").order("nome"),
     ]);
     return (
       <>
         <div className="cabecalho"><div><Link href={`/admin/compras/${id}`} className="suave">← {codigo}</Link><h1>Editar compra {codigo}</h1></div></div>
-        <FormCompra insumos={(insumos ?? []).map((i: any) => ({ ...i, embalagens: (i.insumo_embalagens ?? []).map((e: any) => ({ ...e, conteudo: Number(e.conteudo) })) }))} fornecedores={fornecedores ?? []} valorHora={c.valor_hora_centavos}
+        <FormCompra insumos={(insumos ?? []).map((i: any) => ({ ...i, embalagens: (i.insumo_embalagens ?? []).filter((e: any) => e.ativo).map((e: any) => ({ ...e, conteudo: Number(e.conteudo) })) }))} fornecedores={fornecedores ?? []} valorHora={c.valor_hora_centavos}
           inicial={{ ...c, itens: itens.map((i) => ({ ...i, pacotes: Number(i.pacotes), conteudo: Number(i.conteudo) })) }} />
       </>
     );
@@ -65,7 +65,7 @@ export default async function Compra({ params, searchParams }: { params: Promise
             <tbody>
               {itens.map((i) => (
                 <tr key={i.id}>
-                  <td>{i.insumos?.nome}{i.descricao_original && <div className="suave" style={{ fontSize: "0.8rem" }}>{i.descricao_original}</div>}</td>
+                  <td>{i.insumos?.nome}{i.marcas?.nome && <> · <strong>{i.marcas.nome}</strong></>}{i.descricao_original && <div className="suave" style={{ fontSize: "0.8rem" }}>{i.descricao_original}</div>}</td>
                   <td className="num">{Number(i.pacotes).toLocaleString("pt-BR")} × {Number(i.conteudo).toLocaleString("pt-BR")} {U[i.unidade_conteudo]}</td>
                   <td className="dir num">{Number(i.quantidade_base).toLocaleString("pt-BR")} {i.insumos?.unidade}</td>
                   <td className="dir num">{formatarBRL(i.valor_linha_centavos)}</td>

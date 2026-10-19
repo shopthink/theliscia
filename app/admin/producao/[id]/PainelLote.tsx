@@ -16,13 +16,14 @@ interface Lote {
   produzido_em: string | null; assado_em: string | null; congelado_em: string | null; bases_pedidos: number; unidadeProduto: string | null;
 }
 interface Espera { id: string; tipo: string; inicio: string; fim: string | null; alvo_min: number; lembrete_min: number | null; lembrete_feito_em: string | null }
-interface Consumo { insumo_id: string; nome: string; unidade: string; prevista: number; real: number; custoUnit: number | null; custoTotal: number | null }
+interface Consumo { insumo_id: string; nome: string; unidade: string; marca_id: string | null; marca_nome: string | null; prevista: number; real: number; custoUnit: number | null; custoTotal: number | null }
+interface InsumoLote { id: string; nome: string; unidade: string; marcas?: { id: string; nome: string; em_uso: boolean }[] }
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 
 export function PainelLote({ lote, sessoes, esperas, consumos, insumos, estoque, abertaOutra }: {
   lote: Lote; sessoes: Sessao[]; esperas: Espera[]; consumos: Consumo[];
-  insumos: { id: string; nome: string; unidade: string }[]; estoque: Record<string, number>;
+  insumos: InsumoLote[]; estoque: Record<string, number>;
   abertaOutra: { etapa: string; numero: number; lote_id: string } | null;
 }) {
   const router = useRouter();
@@ -258,11 +259,12 @@ function FormSessao({ etapas, inicial, onSalvar, onCancelar, pendente }: {
 }
 
 function Apontamento({ lote, consumos, insumos, estoque, editavel, agir, pendente, temAberta }: {
-  lote: Lote; consumos: Consumo[]; insumos: { id: string; nome: string; unidade: string }[]; estoque: Record<string, number>;
+  lote: Lote; consumos: Consumo[]; insumos: InsumoLote[]; estoque: Record<string, number>;
   editavel: boolean; agir: (fn: () => Promise<{ erro?: string; ok?: string }>) => void; pendente: boolean; temAberta: boolean;
 }) {
   const [reais, setReais] = useState<Record<string, string>>(() => Object.fromEntries(consumos.map((c) => [c.insumo_id, String(c.real).replace(".", ",")])));
-  const [extras, setExtras] = useState<{ insumo_id: string; nome: string; unidade: string }[]>([]);
+  const [marcas, setMarcas] = useState<Record<string, string>>(() => Object.fromEntries(consumos.map((c) => [c.insumo_id, c.marca_id ?? ""])));
+  const [extras, setExtras] = useState<{ insumo_id: string; nome: string; unidade: string; marca_id: string | null; marca_nome: string | null }[]>([]);
   const [boas, setBoas] = useState(lote.unidades_boas != null ? String(lote.unidades_boas) : "");
   const [perdas, setPerdas] = useState(String(lote.perdas ?? 0));
   const [produzida, setProduzida] = useState(lote.quantidade_produzida != null ? String(lote.quantidade_produzida).replace(".", ",") : "");
@@ -273,7 +275,7 @@ function Apontamento({ lote, consumos, insumos, estoque, editavel, agir, pendent
 
   const payload = () => ({
     id: lote.id,
-    consumos: linhas.map((l) => ({ insumo_id: l.insumo_id, quantidade_real: num(reais[l.insumo_id] ?? "0") || 0 })),
+    consumos: linhas.map((l) => ({ insumo_id: l.insumo_id, quantidade_real: num(reais[l.insumo_id] ?? "0") || 0, marca_id: marcas[l.insumo_id] || null })),
     unidades_boas: lote.tipo === "base" ? (boas === "" ? null : Number(boas)) : null,
     perdas: lote.tipo === "base" ? Number(perdas) || 0 : 0,
     quantidade_produzida: lote.tipo === "preparo" ? (produzida === "" ? null : num(produzida)) : null,
@@ -286,11 +288,12 @@ function Apontamento({ lote, consumos, insumos, estoque, editavel, agir, pendent
         <h2>Consumo</h2>
         <div className="tabela-rolagem">
           <table>
-            <thead><tr><th>Insumo</th><th className="dir">Previsto</th><th className="dir">Real</th><th className="dir">Custo unitário</th><th className="dir">Custo</th></tr></thead>
+            <thead><tr><th>Insumo</th><th>Marca</th><th className="dir">Previsto</th><th className="dir">Real</th><th className="dir">Custo unitário</th><th className="dir">Custo</th></tr></thead>
             <tbody>
               {consumos.map((c) => (
                 <tr key={c.insumo_id}>
                   <td>{c.nome}</td>
+                  <td>{c.marca_nome ?? <span className="suave">sem marca</span>}</td>
                   <td className="dir num">{fmt(c.prevista)} {c.unidade}</td>
                   <td className="dir num">{fmt(c.real)} {c.unidade}</td>
                   <td className="dir num">{c.custoUnit != null ? (c.unidade === "un" ? formatarBRL(Math.round(c.custoUnit)) + "/un" : formatarBRL(Math.round(c.custoUnit * 1000)) + (c.unidade === "ml" ? "/L" : "/kg")) : "—"}</td>
@@ -309,17 +312,25 @@ function Apontamento({ lote, consumos, insumos, estoque, editavel, agir, pendent
   return (
     <div className="cartao">
       <h2>Consumo real e resultado</h2>
-      <p className="suave" style={{ fontSize: "0.9rem" }}>Já vem com o previsto. Corrija o que usou de verdade, inclusive reposições. A baixa no estoque acontece ao concluir.</p>
+      <p className="suave" style={{ fontSize: "0.9rem" }}>Já vem com o previsto e com a marca em uso de cada insumo. Corrija o que usou de verdade, inclusive reposições e a marca. A baixa no estoque da marca acontece ao concluir.</p>
       <div className="tabela-rolagem">
         <table>
-          <thead><tr><th>Insumo</th><th className="dir">Previsto</th><th style={{ width: 140 }}>Real</th><th className="dir">Em estoque</th></tr></thead>
+          <thead><tr><th>Insumo</th><th style={{ minWidth: 150 }}>Marca usada</th><th className="dir">Previsto</th><th style={{ width: 140 }}>Real</th><th className="dir">Em estoque</th></tr></thead>
           <tbody>
             {linhas.map((l) => {
               const real = num(reais[l.insumo_id] ?? "0") || 0;
-              const tem = estoque[l.insumo_id] ?? 0;
+              const tem = estoque[`${l.insumo_id}|${marcas[l.insumo_id] ?? ""}`] ?? 0;
+              const ops = insumos.find((i) => i.id === l.insumo_id)?.marcas ?? [];
               return (
                 <tr key={l.insumo_id}>
                   <td>{l.nome}</td>
+                  <td>
+                    <select aria-label={`Marca de ${l.nome}`} value={marcas[l.insumo_id] ?? ""} onChange={(e) => setMarcas((m) => ({ ...m, [l.insumo_id]: e.target.value }))}>
+                      <option value="">Sem marca</option>
+                      {ops.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                      {l.marca_id && !ops.some((m) => m.id === l.marca_id) && <option value={l.marca_id}>{l.marca_nome}</option>}
+                    </select>
+                  </td>
                   <td className="dir num">{fmt(l.prevista)} {l.unidade}</td>
                   <td><input inputMode="decimal" aria-label={`Consumo real de ${l.nome}`} value={reais[l.insumo_id] ?? ""}
                     onChange={(e) => setReais((r) => ({ ...r, [l.insumo_id]: e.target.value }))} /></td>
@@ -334,7 +345,12 @@ function Apontamento({ lote, consumos, insumos, estoque, editavel, agir, pendent
         <div className="acoes" style={{ margin: "0.6rem 0 1rem" }}>
           <select aria-label="Adicionar insumo" defaultValue="" onChange={(e) => {
             const i = insumos.find((x) => x.id === e.target.value);
-            if (i) { setExtras((x) => [...x, { insumo_id: i.id, nome: i.nome, unidade: i.unidade }]); setReais((r) => ({ ...r, [i.id]: "" })); }
+            if (i) {
+              const emUso = i.marcas?.find((m) => m.em_uso);
+              setExtras((x) => [...x, { insumo_id: i.id, nome: i.nome, unidade: i.unidade, marca_id: emUso?.id ?? null, marca_nome: emUso?.nome ?? null }]);
+              setReais((r) => ({ ...r, [i.id]: "" }));
+              setMarcas((m) => ({ ...m, [i.id]: emUso?.id ?? "" }));
+            }
             e.target.value = "";
           }} style={{ maxWidth: 280 }}>
             <option value="">+ Adicionar insumo usado…</option>

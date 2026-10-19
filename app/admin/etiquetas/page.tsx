@@ -5,23 +5,27 @@ import { codigoLote } from "@/lib/producao";
 import { BotaoImprimir } from "@/components/BotaoImprimir";
 import { localEntrega } from "@/lib/condominios";
 import { NUTRIENTES, alertasFrontais, formatarValor, percentualVD, porcao, type Tabela } from "@/lib/nutricao";
+import { chaveMarcas } from "@/lib/marcas";
 
 export const metadata = { title: "Etiquetas" };
 export const dynamic = "force-dynamic";
 
 interface ReceitaRotulo {
-  id: string; nome: string; rotulo_nome: string | null; rotulo_ingredientes: string | null; rotulo_alergenicos: string | null;
+  id: string; nome: string; rotulo_nome: string | null; rotulo_alergenicos: string | null;
   rotulo_conservacao: string | null; rotulo_preparo: string | null; validade_dias: number | null;
-  peso_assado_g: number | null; porcao_g: number | null; porcao_medida: string | null; nutricao: Tabela | null;
+  peso_assado_g: number | null; porcao_g: number | null; porcao_medida: string | null;
 }
 interface Etiqueta {
   receita: ReceitaRotulo;
+  versaoId: string;
+  marcas: Record<string, string | null>;   // marca de cada insumo usada (lote) ou em uso (sem lote)
+  tabela?: { nutricao: Tabela; ingredientes: string } | null;
   lote: { numero: number; produzido_em: string | null; assado_em: string | null } | null;
   pedido: { numero: number; cliente: string; local: string | null } | null;
   indice: number; total: number;
 }
 
-const CAMPOS_RECEITA = "id, nome, rotulo_nome, rotulo_ingredientes, rotulo_alergenicos, rotulo_conservacao, rotulo_preparo, validade_dias, peso_assado_g, porcao_g, porcao_medida, nutricao";
+const CAMPOS_RECEITA = "id, nome, rotulo_nome, rotulo_alergenicos, rotulo_conservacao, rotulo_preparo, validade_dias, peso_assado_g, porcao_g, porcao_medida";
 
 /** Na etiqueta só vai condomínio e unidade (endereço completo fica fora por privacidade). */
 function localCurto(p: { modalidade: string; condominio_nome?: string | null; bloco?: string | null; apto?: string | null }) {
@@ -35,9 +39,15 @@ function somarDias(iso: string, dias: number) {
   return d.toISOString().slice(0, 10);
 }
 
+function marcasDoLote(consumos: { insumo_id: string; marca_id: string | null }[] | null | undefined) {
+  return Object.fromEntries((consumos ?? []).map((c) => [c.insumo_id, c.marca_id]));
+}
+
 export default async function Etiquetas({ searchParams }: { searchParams: Promise<{ lote?: string; pedido?: string }> }) {
   const sp = await searchParams;
   const { supabase } = await exigirAdmin();
+  const { data: emUsoLista } = await supabase.from("marcas").select("id, insumo_id").eq("em_uso", true);
+  const emUso: Record<string, string | null> = Object.fromEntries((emUsoLista ?? []).map((m) => [m.insumo_id, m.id]));
   const { data: cfg } = await supabase.from("configuracoes").select("nome_comercial, rotulo_fabricante, rotulo_documento, rotulo_endereco, rotulo_contato").single();
 
   let titulo = "";
@@ -46,23 +56,24 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
 
   if (sp.lote) {
     const { data: l } = await supabase.from("lotes")
-      .select(`id, numero, tipo, status, produzido_em, assado_em, bases_pedidos, bases_extras, unidades_boas, receitas(${CAMPOS_RECEITA}), pedido_itens(quantidade, pedidos(numero, cliente_nome, modalidade, condominio_nome, bloco, apto))`)
+      .select(`id, numero, tipo, status, produzido_em, assado_em, bases_pedidos, bases_extras, unidades_boas, receita_versao_id, receitas(${CAMPOS_RECEITA}), lote_consumos(insumo_id, marca_id), pedido_itens(quantidade, pedidos(numero, cliente_nome, modalidade, condominio_nome, bloco, apto))`)
       .eq("id", sp.lote).maybeSingle();
     if (l && l.tipo === "base") {
       titulo = `Lote ${codigoLote(l.numero)}`;
       voltar = `/admin/producao/${l.id}`;
       const receita = l.receitas as unknown as ReceitaRotulo;
       const lote = { numero: l.numero, produzido_em: l.produzido_em, assado_em: l.assado_em };
+      const base = { receita, versaoId: l.receita_versao_id, marcas: marcasDoLote(l.lote_consumos as any[]) };
       const itens = ((l.pedido_itens as any[]) ?? []).sort((a, b) => a.pedidos.numero - b.pedidos.numero);
       for (const it of itens) for (let k = 1; k <= it.quantidade; k++)
-        etiquetas.push({ receita, lote, pedido: { numero: it.pedidos.numero, cliente: it.pedidos.cliente_nome, local: localCurto(it.pedidos) }, indice: k, total: it.quantidade });
+        etiquetas.push({ ...base, lote, pedido: { numero: it.pedidos.numero, cliente: it.pedidos.cliente_nome, local: localCurto(it.pedidos) }, indice: k, total: it.quantidade });
       const totalLote = l.status === "concluido" && l.unidades_boas != null ? l.unidades_boas : l.bases_pedidos + l.bases_extras;
       const extras = Math.max(0, totalLote - itens.reduce((s, i) => s + i.quantidade, 0));
-      for (let k = 1; k <= extras; k++) etiquetas.push({ receita, lote, pedido: null, indice: k, total: extras });
+      for (let k = 1; k <= extras; k++) etiquetas.push({ ...base, lote, pedido: null, indice: k, total: extras });
     }
   } else if (sp.pedido) {
     const { data: p } = await supabase.from("pedidos")
-      .select(`id, numero, cliente_nome, modalidade, condominio_nome, bloco, apto, pedido_itens(quantidade, receitas(${CAMPOS_RECEITA}), lotes(numero, produzido_em, assado_em))`)
+      .select(`id, numero, cliente_nome, modalidade, condominio_nome, bloco, apto, pedido_itens(quantidade, receita_versao_id, receitas(${CAMPOS_RECEITA}), lotes(numero, produzido_em, assado_em, receita_versao_id, lote_consumos(insumo_id, marca_id)))`)
       .eq("id", sp.pedido).maybeSingle();
     if (p) {
       titulo = `Pedido #${String(p.numero).padStart(4, "0")}`;
@@ -71,15 +82,40 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
       let n = 0;
       for (const it of (p.pedido_itens as any[]) ?? [])
         for (let k = 1; k <= it.quantidade; k++)
-          etiquetas.push({ receita: it.receitas, lote: it.lotes, pedido: { numero: p.numero, cliente: p.cliente_nome, local: localCurto(p) }, indice: ++n, total });
+          etiquetas.push({
+            receita: it.receitas, lote: it.lotes, versaoId: it.lotes?.receita_versao_id ?? it.receita_versao_id,
+            marcas: it.lotes ? marcasDoLote(it.lotes.lote_consumos) : emUso,
+            pedido: { numero: p.numero, cliente: p.cliente_nome, local: localCurto(p) }, indice: ++n, total,
+          });
+    }
+  }
+
+  // Cada etiqueta usa a tabela validada da combinação de marcas dos ingredientes da receita
+  const versoes = [...new Set(etiquetas.map((e) => e.versaoId))];
+  const receitaIds = [...new Set(etiquetas.map((e) => e.receita.id))];
+  const [{ data: ingVersoes }, { data: tabelas }, { data: nomesMarcas }] = await Promise.all([
+    versoes.length ? supabase.from("receita_versao_ingredientes").select("receita_versao_id, insumo_id, insumos(nome)").in("receita_versao_id", versoes) : Promise.resolve({ data: [] as any[] }),
+    receitaIds.length ? supabase.from("receita_tabelas").select("receita_id, chave, nutricao, ingredientes").in("receita_id", receitaIds) : Promise.resolve({ data: [] as any[] }),
+    supabase.from("marcas").select("id, nome"),
+  ]);
+  const faltando = new Map<string, { receita: ReceitaRotulo; combo: Record<string, string | null>; descricao: string }>();
+  for (const e of etiquetas) {
+    const ings = (ingVersoes ?? []).filter((g: any) => g.receita_versao_id === e.versaoId);
+    const combo = Object.fromEntries(ings.map((g: any) => [g.insumo_id, e.marcas[g.insumo_id] ?? null]));
+    const chave = chaveMarcas(combo);
+    const t = (tabelas ?? []).find((x: any) => x.receita_id === e.receita.id && x.chave === chave);
+    e.tabela = t ? { nutricao: t.nutricao, ingredientes: t.ingredientes } : null;
+    if (!t && !faltando.has(`${e.receita.id}|${chave}`)) {
+      const descricao = ings.map((g: any) => `${g.insumos?.nome}: ${(nomesMarcas ?? []).find((m) => m.id === combo[g.insumo_id])?.nome ?? "sem marca"}`).join(" · ");
+      faltando.set(`${e.receita.id}|${chave}`, { receita: e.receita, combo, descricao });
     }
   }
 
   const receitas = [...new Map(etiquetas.map((e) => [e.receita.id, e.receita])).values()];
-  const bloqueadas = receitas.filter((r) => !r.nutricao || !r.peso_assado_g || !r.porcao_g);
+  const bloqueadas = receitas.filter((r) => !r.peso_assado_g || !r.porcao_g);
   const semLote = etiquetas.some((e) => !e.lote);
   const semForno = etiquetas.some((e) => e.lote && !e.lote.assado_em);
-  const imprimiveis = etiquetas.filter((e) => !bloqueadas.includes(e.receita));
+  const imprimiveis = etiquetas.filter((e) => !bloqueadas.includes(e.receita) && e.tabela);
 
   return (
     <>
@@ -96,8 +132,14 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
         {!etiquetas.length && <div className="cartao vazio">Nada para imprimir. Abra pelas telas de lote ou de pedido.</div>}
         {bloqueadas.map((r) => (
           <div key={r.id} className="aviso erro">
-            <strong>{r.nome}</strong>: complete peso assado, porção e valide a tabela nutricional antes de imprimir.{" "}
+            <strong>{r.nome}</strong>: complete peso assado e porção antes de imprimir.{" "}
             <Link href={`/admin/receitas/${r.id}`}>Abrir receita</Link>
+          </div>
+        ))}
+        {[...faltando.values()].filter((f) => !bloqueadas.includes(f.receita)).map((f) => (
+          <div key={f.descricao + f.receita.id} className="aviso erro">
+            <strong>{f.receita.nome}</strong>: a combinação de marcas deste lote ainda não tem tabela validada ({f.descricao}).{" "}
+            <Link href={`/admin/receitas/${f.receita.id}?marcas=${encodeURIComponent(JSON.stringify(f.combo))}#tabela`}>Validar esta combinação</Link>
           </div>
         ))}
         {semLote && <div className="aviso alerta">Há bases deste pedido que ainda não estão em nenhum lote: sem número de lote e datas.</div>}
@@ -119,7 +161,7 @@ export default async function Etiquetas({ searchParams }: { searchParams: Promis
 
 function EtiquetaBase({ e, cfg }: { e: Etiqueta; cfg: any }) {
   const r = e.receita;
-  const t = r.nutricao!;
+  const t = e.tabela!.nutricao;
   const p = porcao(t, Number(r.porcao_g));
   const porcoes = Math.max(1, Math.round((Number(r.peso_assado_g) / Number(r.porcao_g)) * 10) / 10);
   const alertas = alertasFrontais(t);
@@ -157,7 +199,7 @@ function EtiquetaBase({ e, cfg }: { e: Etiqueta; cfg: any }) {
         <div><span>Validade</span><strong>{formatarData(validade)}</strong></div>
       </div>
 
-      <p className="et-texto"><strong>INGREDIENTES:</strong> {r.rotulo_ingredientes}</p>
+      <p className="et-texto"><strong>INGREDIENTES:</strong> {e.tabela!.ingredientes}</p>
       {r.rotulo_alergenicos && <p className="et-alergenicos">{r.rotulo_alergenicos}</p>}
 
       <table className="et-tabela">

@@ -199,6 +199,7 @@ tr.clicavel:hover td { background: rgba(41,57,47,0.04); }
 .opcao-receber input { margin-top: 0.25rem; }
 .opcao-receber small { display: block; color: var(--suave); }
 .grupo-entrega { margin-bottom: 1.25rem; }
+button.link { background: none; border: 0; padding: 0; min-height: 0; color: var(--bordo); text-decoration: underline; font: inherit; cursor: pointer; }
 .etiqueta-crm { display: inline-block; background: var(--creme-2); border-radius: 6px; padding: 0 0.4rem; margin: 2px 4px 0 0; }
 .filtros-clientes { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: flex-end; }
 .filtros-clientes .campo { margin: 0; flex: 1 1 180px; }

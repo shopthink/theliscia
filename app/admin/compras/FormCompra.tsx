@@ -5,10 +5,12 @@ import { formatarBRL, lerBRL } from "@/lib/dinheiro";
 import { hojeSP } from "@/lib/datas";
 import { custoTempo, normalizarQuantidade, ratear } from "@/lib/rateio";
 import { lerCupom, sugerirInsumo } from "@/lib/cupom";
+import { sugerirMarca } from "@/lib/marcas";
 import { salvarCompra, type CompraForm } from "./actions";
 
-interface EmbalagemOpcao { id: string; nome: string; conteudo: number; unidade: string }
-interface Insumo { id: string; nome: string; unidade: string; embalagens?: EmbalagemOpcao[] }
+interface EmbalagemOpcao { id: string; nome: string; conteudo: number; unidade: string; marca_id?: string | null }
+interface MarcaOpcao { id: string; nome: string; em_uso: boolean; ativo?: boolean }
+interface Insumo { id: string; nome: string; unidade: string; embalagens?: EmbalagemOpcao[]; marcas?: MarcaOpcao[] }
 interface Fornecedor { id: string; nome: string }
 
 interface Linha {
@@ -19,6 +21,9 @@ interface Linha {
   conteudo: string;
   unidade: string;
   valor: string;
+  marca: string;      // id da marca, "" sem marca, "__nova" para digitar
+  marcaNome: string;
+  usarMarca: boolean;
   doCupom?: boolean;
 }
 
@@ -35,7 +40,7 @@ export interface InicialCompra {
   desconto_centavos: number;
   observacoes: string | null;
   ocr_total_centavos: number | null;
-  itens: { insumo_id: string; descricao_original: string | null; pacotes: number; conteudo: number; unidade_conteudo: string; valor_linha_centavos: number }[];
+  itens: { insumo_id: string; marca_id: string | null; descricao_original: string | null; pacotes: number; conteudo: number; unidade_conteudo: string; valor_linha_centavos: number }[];
 }
 
 const UNIDADES: Record<string, { v: string; r: string }[]> = {
@@ -51,7 +56,8 @@ const num = (t: string) => {
   return Number.isFinite(n) ? n : NaN;
 };
 let seq = 0;
-const novaLinha = (p: Partial<Linha> = {}): Linha => ({ chave: `l${++seq}`, insumo_id: "", descricao: "", pacotes: "1", conteudo: "", unidade: "", valor: "", ...p });
+const novaLinha = (p: Partial<Linha> = {}): Linha => ({ chave: `l${++seq}`, insumo_id: "", descricao: "", pacotes: "1", conteudo: "", unidade: "", valor: "", marca: "", marcaNome: "", usarMarca: false, ...p });
+const marcaEmUso = (ins?: Insumo) => ins?.marcas?.find((m) => m.em_uso)?.id ?? "";
 
 function compativel(unidadeInsumo: string | undefined, u: string) {
   if (!unidadeInsumo || !u) return false;
@@ -78,7 +84,7 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
   const [linhas, setLinhas] = useState<Linha[]>(
     inicial?.itens.length
       ? inicial.itens.map((i) => novaLinha({
-          insumo_id: i.insumo_id, descricao: i.descricao_original ?? "", pacotes: String(i.pacotes).replace(".", ","),
+          insumo_id: i.insumo_id, marca: i.marca_id ?? "", descricao: i.descricao_original ?? "", pacotes: String(i.pacotes).replace(".", ","),
           conteudo: String(i.conteudo).replace(".", ","), unidade: i.unidade_conteudo, valor: reais(i.valor_linha_centavos),
         }))
       : [novaLinha()],
@@ -121,9 +127,12 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
       }
       const novas = leitura.itens.map((it) => {
         const s = sugerirInsumo(it.descricao, insumos);
+        const ins = s ? insumos.find((x) => x.id === s.id) : undefined;
+        const m = ins?.marcas?.length ? sugerirMarca(it.descricao, ins.marcas.filter((x) => x.ativo !== false)) : null;
         return novaLinha({
           doCupom: true,
           insumo_id: s?.id ?? "",
+          marca: m?.id ?? marcaEmUso(ins),
           descricao: it.descricao,
           pacotes: it.pacotes ? String(it.pacotes) : "",
           conteudo: it.conteudo != null ? String(it.conteudo).replace(".", ",") : "",
@@ -171,6 +180,7 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
       if (!l.insumo_id) return setErro(`Linha ${k + 1}: escolha o insumo ou remova a linha (itens pessoais não entram).`);
       if (!(num(l.pacotes) > 0) || !(num(l.conteudo) > 0) || !l.unidade) return setErro(`Linha ${k + 1}: informe pacotes, conteúdo e unidade da embalagem.`);
       if (lerBRL(l.valor) == null) return setErro(`Linha ${k + 1}: informe o valor da linha.`);
+      if (l.marca === "__nova" && !l.marcaNome.trim()) return setErro(`Linha ${k + 1}: digite o nome da nova marca ou escolha uma da lista.`);
     }
     const payload: CompraForm = {
       id: inicial?.id,
@@ -188,6 +198,9 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
       ocr_total_centavos: ocrTotal,
       itens: linhas.map((l) => ({
         insumo_id: l.insumo_id,
+        marca_id: l.marca && l.marca !== "__nova" ? l.marca : undefined,
+        marca_nome: l.marca === "__nova" ? l.marcaNome.trim() : undefined,
+        usar_marca: l.usarMarca || undefined,
         descricao_original: l.descricao,
         pacotes: num(l.pacotes),
         conteudo: num(l.conteudo),
@@ -277,23 +290,45 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
                   <select id={`ins-${l.chave}`} value={l.insumo_id} style={!l.insumo_id ? destaque : undefined}
                     onChange={(e) => {
                       const novo = insumo(e.target.value);
-                      set(k, { insumo_id: e.target.value, unidade: novo && compativel(novo.unidade, l.unidade) ? l.unidade : novo?.unidade === "un" ? "un" : "" });
+                      set(k, { insumo_id: e.target.value, marca: marcaEmUso(novo), marcaNome: "", usarMarca: false,
+                        unidade: novo && compativel(novo.unidade, l.unidade) ? l.unidade : novo?.unidade === "un" ? "un" : "" });
                     }}>
                     <option value="">Escolha…</option>
                     {insumos.map((i) => <option key={i.id} value={i.id}>{i.nome}</option>)}
                   </select>
                 </div>
+                {ins && (
+                  <div className="campo" style={{ gridColumn: "span 2" }}>
+                    <label htmlFor={`m-${l.chave}`}>Marca</label>
+                    <select id={`m-${l.chave}`} value={l.marca} onChange={(e) => set(k, { marca: e.target.value, usarMarca: false })}>
+                      <option value="">Sem marca</option>
+                      {(ins.marcas ?? []).filter((m) => m.ativo !== false || m.id === l.marca).map((m) => <option key={m.id} value={m.id}>{m.nome}{m.em_uso ? " (em uso)" : ""}</option>)}
+                      <option value="__nova">+ Nova marca</option>
+                    </select>
+                  </div>
+                )}
+                {ins && l.marca === "__nova" && (
+                  <div className="campo" style={{ gridColumn: "span 2" }}>
+                    <label htmlFor={`mn-${l.chave}`}>Nome da nova marca</label>
+                    <input id={`mn-${l.chave}`} value={l.marcaNome} maxLength={80} placeholder="Ex.: Caputo Pizzeria" style={!l.marcaNome.trim() ? destaque : undefined}
+                      onChange={(e) => set(k, { marcaNome: e.target.value })} />
+                  </div>
+                )}
                 {!!ins?.embalagens?.length && (
                   <div className="campo" style={{ gridColumn: "span 2" }}>
                     <label htmlFor={`e-${l.chave}`}>Embalagem</label>
                     <select id={`e-${l.chave}`}
-                      value={ins.embalagens.find((e) => e.unidade === l.unidade && Number(e.conteudo) === num(l.conteudo))?.id ?? ""}
+                      value={ins.embalagens.find((e) => e.unidade === l.unidade && Number(e.conteudo) === num(l.conteudo) && (e.marca_id ?? "") === (l.marca === "__nova" ? "" : l.marca))?.id
+                        ?? ins.embalagens.find((e) => e.unidade === l.unidade && Number(e.conteudo) === num(l.conteudo) && !e.marca_id)?.id ?? ""}
                       onChange={(ev) => {
                         const emb = ins.embalagens!.find((e) => e.id === ev.target.value);
-                        if (emb) set(k, { conteudo: String(emb.conteudo).replace(".", ","), unidade: emb.unidade });
+                        if (emb) set(k, { conteudo: String(emb.conteudo).replace(".", ","), unidade: emb.unidade, ...(emb.marca_id ? { marca: emb.marca_id, usarMarca: false } : {}) });
                       }}>
                       <option value="">Outra (digitar)</option>
-                      {ins.embalagens.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                      {ins.embalagens.map((e) => {
+                        const m = ins.marcas?.find((x) => x.id === e.marca_id);
+                        return <option key={e.id} value={e.id}>{m ? `${m.nome} · ${e.nome}` : e.nome}</option>;
+                      })}
                     </select>
                   </div>
                 )}
@@ -327,6 +362,12 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
                   {previa.finais && <> · custo final <strong>{formatarBRL(previa.finais[k])}</strong></>}
                   {unidadeRuim && <span style={{ color: "var(--erro)" }}> · unidade incompatível com o insumo</span>}
                 </span>
+                {ins && l.marca && l.marca !== marcaEmUso(ins) && (
+                  <label className="check" style={{ fontSize: "0.88rem" }}>
+                    <input type="checkbox" checked={l.usarMarca} onChange={(e) => set(k, { usarMarca: e.target.checked })} />
+                    Usar esta marca nos próximos lotes{marcaEmUso(ins) ? ` (hoje: ${ins.marcas?.find((m) => m.em_uso)?.nome})` : ""}
+                  </label>
+                )}
                 <button type="button" className="contorno pequeno" onClick={() => setLinhas((ls) => ls.length > 1 ? ls.filter((_, i) => i !== k) : [novaLinha()])}>Remover</button>
               </div>
             </div>

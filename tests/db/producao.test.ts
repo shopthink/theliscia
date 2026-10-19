@@ -176,8 +176,10 @@ describe.skipIf(!HOST)("produção", () => {
     const v = { kcal: 250, carboidratos_g: 50, acucares_totais_g: 0.5, acucares_adic_g: 0, proteinas_g: 8, gorduras_g: 1, saturadas_g: 0.2, trans_g: 0, fibras_g: 2, sodio_mg: 820 };
     await expect(q(`select public.validar_nutricao($1, $2::jsonb)`, [rec.italiana, JSON.stringify({ ...v, sodio_mg: null })])).rejects.toThrow(/sodio_mg/);
     await expect(amb.como("outro", `select public.validar_nutricao($1, $2::jsonb)`, [rec.italiana, JSON.stringify(v)])).rejects.toThrow(/Acesso negado/);
-    await q(`select public.validar_nutricao($1, $2::jsonb)`, [rec.italiana, JSON.stringify(v)]);
-    const r = await um(`select (nutricao->>'sodio_mg')::int as na, nutricao_versao_id = versao_atual_id as mesma, rotulo_alergenicos from public.receitas where id = $1`, [rec.italiana]);
-    expect(r).toEqual({ na: 820, mesma: true, rotulo_alergenicos: "ALÉRGICOS: CONTÉM TRIGO E CEVADA. CONTÉM GLÚTEN." });
+    await expect(q(`select public.validar_nutricao($1, $2::jsonb)`, [rec.italiana, JSON.stringify(v)])).rejects.toThrow(/ingredientes/);
+    await q(`select public.validar_nutricao($1, $2::jsonb, '{}'::jsonb, 'Farinha de trigo, cerveja, água, sal e fermento.')`, [rec.italiana, JSON.stringify(v)]);
+    const r = await um(`select (t.nutricao->>'sodio_mg')::int as na, t.receita_versao_id = r.versao_atual_id as mesma, t.chave, r.rotulo_alergenicos
+                          from public.receita_tabelas t join public.receitas r on r.id = t.receita_id where t.receita_id = $1`, [rec.italiana]);
+    expect(r).toEqual({ na: 820, mesma: true, chave: "", rotulo_alergenicos: "ALÉRGICOS: CONTÉM TRIGO E CEVADA. CONTÉM GLÚTEN." });
   });
 });
