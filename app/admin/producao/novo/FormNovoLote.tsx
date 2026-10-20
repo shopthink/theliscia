@@ -14,8 +14,8 @@ interface Auxiliar { id: string; nome: string; unidade: string; uso_auxiliar: st
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 
-export function FormNovoLote({ receita: r, itens, aux, auxiliares, estoque, hoje }: {
-  receita: Receita; itens: Item[]; aux: Record<string, number>; auxiliares: Auxiliar[]; estoque: Record<string, number>; hoje: string;
+export function FormNovoLote({ receita: r, itens, aux, auxiliares, estoque, casa = [], hoje }: {
+  receita: Receita; itens: Item[]; aux: Record<string, number>; auxiliares: Auxiliar[]; estoque: Record<string, number>; casa?: string[]; hoje: string;
 }) {
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -132,7 +132,9 @@ export function FormNovoLote({ receita: r, itens, aux, auxiliares, estoque, hoje
                   <tr key={l.id}>
                     <td>{l.nome}</td>
                     <td className="dir num"><strong>{fmt(l.q)} {l.unidade}</strong></td>
-                    <td className="dir num" style={tem < l.q && l.nome !== "Água filtrada" ? { color: "var(--erro)" } : undefined}>{fmt(tem)} {l.unidade}</td>
+                    {casa.includes(l.id)
+                      ? <td className="dir suave">da casa</td>
+                      : <td className="dir num" style={tem < l.q ? { color: "var(--erro)" } : undefined}>{fmt(tem)} {l.unidade}</td>}
                   </tr>
                 );
               })}

@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/auth";
 import { mensagemDoBanco, type EstadoForm } from "@/lib/erros";
 
@@ -45,7 +46,7 @@ export async function criarReceita(_: EstadoForm, d: FormData): Promise<EstadoFo
   const { data, error } = await supabase.from("receitas").insert({ nome, codigo, tipo, produz_insumo_id: tipo === "preparo" ? produz : null }).select("id").single();
   if (error) return { erro: error.code === "23505" ? "Já existe uma receita com esse nome." : mensagemDoBanco(error) };
   revalidatePath("/admin/receitas");
-  return { ok: "Receita criada. Abra-a para cadastrar a ficha técnica.", dados: { id: data.id } };
+  redirect(`/admin/receitas/${data.id}?nova=1`);
 }
 
 export async function salvarRotulo(_: EstadoForm, d: FormData): Promise<EstadoForm> {

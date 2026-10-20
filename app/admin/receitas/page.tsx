@@ -14,7 +14,7 @@ export default async function Receitas() {
       .order("tipo").order("nome"),
     supabase.from("insumos").select("id, nome, unidade").eq("ativo", true).order("nome"),
   ]);
-  const farinha = insumos?.find((i) => i.nome === "Farinha");
+  const farinha = insumos?.find((i) => /^farinha/i.test(i.nome.trim()));
   const bases = (receitas ?? []).filter((r: any) => r.tipo === "base");
   const preparos = (receitas ?? []).filter((r: any) => r.tipo === "preparo");
   const atual = (r: any) => r.receita_versoes.find((x: any) => x.id === r.versao_atual_id);

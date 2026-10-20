@@ -28,7 +28,7 @@ export default async function Receita({ params, searchParams }: { params: Promis
   const ings = (atual?.receita_versao_ingredientes ?? []).map((i: any) => ({
     insumo_id: i.insumo_id, nome: i.insumos.nome, unidade: i.insumos.unidade, quantidade: Number(i.quantidade), densidade_g: Number(i.densidade_g),
   }));
-  const farinha = insumos?.find((i) => i.nome === "Farinha")?.id ?? "";
+  const farinha = insumos?.find((i) => /^farinha/i.test(i.nome.trim()))?.id ?? "";
   const preparo = r.tipo === "preparo";
   const produz = (r as any).produz as { nome: string; unidade: string } | null;
 

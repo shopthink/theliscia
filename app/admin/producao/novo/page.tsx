@@ -33,6 +33,7 @@ export default async function NovoLote({ searchParams }: { searchParams: Promise
     estoqueLote[x.insumo_id] = (estoqueLote[x.insumo_id] ?? 0) + Number(x.quantidade);
   }
   const { data: auxiliares } = await supabase.from("insumos").select("id, nome, unidade, uso_auxiliar").not("uso_auxiliar", "is", null);
+  const { data: daCasa } = await supabase.from("insumos").select("id").eq("controla_estoque", false);
 
   return (
     <>
@@ -59,7 +60,7 @@ export default async function NovoLote({ searchParams }: { searchParams: Promise
           itens={((itens ?? []) as any[]).sort((a, b) => a.pedidos.entrega_em.localeCompare(b.pedidos.entrega_em) || a.pedidos.numero - b.pedidos.numero)}
           aux={Object.fromEntries(Object.entries(cfg ?? {}).map(([k, v]) => [k, Number(v)]))}
           auxiliares={auxiliares ?? []}
-          estoque={estoqueLote}
+          estoque={estoqueLote} casa={(daCasa ?? []).map((x) => x.id)}
           hoje={hojeSP()}
         />
       )}

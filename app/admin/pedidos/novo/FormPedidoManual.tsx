@@ -31,17 +31,27 @@ export function FormPedidoManual({ receitas, campanhas, condominios }: { receita
     receitas.map((r) => ({ receita_id: r.id, quantidade: 0, preco: precoSugerido(r.id) })),
   );
   const [estado, enviar] = useActionState(criarPedidoManual, {});
+  const [tipo, setTipo] = useState<"venda" | "brinde">("venda");
+  const brinde = tipo === "brinde";
 
   const itens = linhas
     .filter((l) => l.quantidade > 0)
-    .map((l) => ({ receita_id: l.receita_id, quantidade: l.quantidade, preco_centavos: lerBRL(l.preco) ?? -1 }));
-  const taxaCentavos = modalidade === "entrega" ? lerBRL(taxa) ?? 0 : 0;
+    .map((l) => ({ receita_id: l.receita_id, quantidade: l.quantidade, preco_centavos: brinde ? 0 : lerBRL(l.preco) ?? -1 }));
+  const taxaCentavos = modalidade === "entrega" && !brinde ? lerBRL(taxa) ?? 0 : 0;
   const total = useMemo(() => itens.reduce((s, i) => s + i.quantidade * Math.max(0, i.preco_centavos), 0), [itens]) + taxaCentavos;
   const precoInvalido = itens.some((i) => i.preco_centavos < 0);
 
   return (
     <form action={enviar}>
       <input type="hidden" name="itens" value={JSON.stringify(itens)} />
+      <input type="hidden" name="tipo" value={tipo} />
+      <div className="cartao">
+        <h2>Tipo de pedido</h2>
+        <div className="opcoes-receber" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+          <label className="opcao-receber"><input type="radio" checked={!brinde} onChange={() => setTipo("venda")} /><span>Venda <small>Cliente paga</small></span></label>
+          <label className="opcao-receber"><input type="radio" checked={brinde} onChange={() => setTipo("brinde")} /><span>Brinde (cortesia) <small>Sem cobrança. O custo vai para “brindes e marketing” no fechamento.</small></span></label>
+        </div>
+      </div>
       <div className="cartao">
         <h2>Itens</h2>
         <div className="campo">
@@ -66,7 +76,7 @@ export function FormPedidoManual({ receitas, campanhas, condominios }: { receita
         </div>
         <div className="tabela-rolagem">
           <table>
-            <thead><tr><th>Receita</th><th style={{ width: 110 }}>Quantidade</th><th style={{ width: 140 }}>Preço por base (R$)</th><th className="dir">Subtotal</th></tr></thead>
+            <thead><tr><th>Receita</th><th style={{ width: 110 }}>Quantidade</th>{!brinde && <th style={{ width: 140 }}>Preço por base (R$)</th>}{!brinde && <th className="dir">Subtotal</th>}</tr></thead>
             <tbody>
               {linhas.map((l, k) => {
                 const r = receitas.find((x) => x.id === l.receita_id)!;
@@ -76,9 +86,9 @@ export function FormPedidoManual({ receitas, campanhas, condominios }: { receita
                     <td>{r.nome}</td>
                     <td><input type="number" min={0} max={999} value={l.quantidade || ""} placeholder="0" aria-label={`Quantidade de ${r.nome}`}
                       onChange={(e) => setLinhas((ls) => ls.map((x, i) => i === k ? { ...x, quantidade: Math.max(0, Math.floor(Number(e.target.value) || 0)) } : x))} /></td>
-                    <td><input inputMode="decimal" value={l.preco} placeholder="0,00" aria-label={`Preço de ${r.nome}`}
-                      onChange={(e) => setLinhas((ls) => ls.map((x, i) => i === k ? { ...x, preco: e.target.value } : x))} /></td>
-                    <td className="dir num">{l.quantidade && preco != null ? formatarBRL(l.quantidade * preco) : "—"}</td>
+                    {!brinde && <td><input inputMode="decimal" value={l.preco} placeholder="0,00" aria-label={`Preço de ${r.nome}`}
+                      onChange={(e) => setLinhas((ls) => ls.map((x, i) => i === k ? { ...x, preco: e.target.value } : x))} /></td>}
+                    {!brinde && <td className="dir num">{l.quantidade && preco != null ? formatarBRL(l.quantidade * preco) : "—"}</td>}
                   </tr>
                 );
               })}
@@ -86,7 +96,8 @@ export function FormPedidoManual({ receitas, campanhas, condominios }: { receita
           </table>
         </div>
         {taxaCentavos > 0 && <div className="linha-total"><span>Taxa de entrega</span><span className="num">{formatarBRL(taxaCentavos)}</span></div>}
-        <div className="linha-total forte"><span>Total</span><span className="num">{formatarBRL(total)}</span></div>
+        {brinde ? <div className="linha-total forte"><span>Brinde</span><span className="num">sem cobrança</span></div>
+          : <div className="linha-total forte"><span>Total</span><span className="num">{formatarBRL(total)}</span></div>}
         {precoInvalido && <div className="aviso erro">Informe o preço de todos os itens com quantidade.</div>}
       </div>
 
@@ -122,13 +133,13 @@ export function FormPedidoManual({ receitas, campanhas, condominios }: { receita
         {modalidade === "entrega" && (
           <div className="grade">
             <div className="campo" style={{ flex: 2 }}><label htmlFor="endereco">Endereço</label><textarea id="endereco" name="endereco" /></div>
-            <div className="campo"><label htmlFor="taxa_entrega">Taxa de entrega (R$)</label><input id="taxa_entrega" name="taxa_entrega" inputMode="decimal" value={taxa} onChange={(e) => setTaxa(e.target.value)} placeholder="0,00" /></div>
+            {!brinde && <div className="campo"><label htmlFor="taxa_entrega">Taxa de entrega (R$)</label><input id="taxa_entrega" name="taxa_entrega" inputMode="decimal" value={taxa} onChange={(e) => setTaxa(e.target.value)} placeholder="0,00" /></div>}
           </div>
         )}
         <div className="campo"><label htmlFor="observacoes">Observações</label><textarea id="observacoes" name="observacoes" /></div>
       </div>
 
-      <div className="cartao">
+      {!brinde && <div className="cartao">
         <h2>Já recebeu algum valor? (opcional)</h2>
         <div className="grade">
           <div className="campo"><label htmlFor="valor_pago">Valor recebido (R$)</label><input id="valor_pago" name="valor_pago" inputMode="decimal" placeholder="0,00" /></div>
@@ -139,10 +150,10 @@ export function FormPedidoManual({ receitas, campanhas, condominios }: { receita
           <div className="campo"><label htmlFor="referencia">Identificação (opcional)</label><input id="referencia" name="referencia" /></div>
         </div>
         <p className="suave" style={{ margin: 0 }}>Registre só o que você já conferiu na conta ou recebeu em mãos.</p>
-      </div>
+      </div>}
 
       {estado.erro && <div className="aviso erro" role="alert">{estado.erro}</div>}
-      <Enviar desabilitado={!itens.length || precoInvalido} />
+      <Enviar desabilitado={!itens.length || (!brinde && precoInvalido)} />
     </form>
   );
 }

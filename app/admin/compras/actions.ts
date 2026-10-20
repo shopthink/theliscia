@@ -65,6 +65,7 @@ export async function registrarAjuste(_: EstadoForm, d: FormData): Promise<Estad
   if (!insumoId) return { erro: "Escolha o insumo e a marca." };
   const { error } = await supabase.rpc("registrar_ajuste_estoque", {
     p_marca_id: marcaId || null,
+    p_categoria: tipo === "perda" ? String(d.get("categoria") ?? "outro") : null,
     p_insumo_id: insumoId,
     p_quantidade: quantidade,
     p_tipo: tipo,

@@ -10,6 +10,10 @@ import { registrarAjuste, salvarFornecedor } from "./actions";
 
 export const metadata = { title: "Compras e estoque" };
 
+const MOTIVOS_PERDA: Record<string, string> = {
+  derramou: "Derramou ou caiu", vencido: "Venceu", estragou: "Estragou ou contaminou", uso_indevido: "Alguém usou", quebra: "Embalagem quebrou ou rasgou", outro: "Outro",
+};
+
 type Aba = "compras" | "estoque" | "lista" | "fornecedores";
 
 const POR: Record<string, [string, number]> = { g: ["kg", 1000], ml: ["L", 1000], un: ["un", 1] };
@@ -105,9 +109,9 @@ async function ListaCompras({ ver }: { ver?: string }) {
 async function Estoque() {
   const { supabase } = await exigirAdmin();
   const [{ data: insumos }, { data: saldos }, { data: movs }] = await Promise.all([
-    supabase.from("insumos").select("id, nome, unidade, categoria, preco_ref_centavos, ativo, marcas(id, nome, em_uso, ativo)").order("categoria").order("nome"),
+    supabase.from("insumos").select("id, nome, unidade, categoria, preco_ref_centavos, ativo, controla_estoque, marcas(id, nome, em_uso, ativo)").order("categoria").order("nome"),
     supabase.from("estoque_saldos").select("insumo_id, marca_id, quantidade, valor_centavos, marcas(nome)"),
-    supabase.from("estoque_movimentos").select("id, tipo, quantidade, valor_centavos, data, motivo, criado_em, insumos(nome, unidade), marcas(nome), compras(numero)").order("criado_em", { ascending: false }).limit(40),
+    supabase.from("estoque_movimentos").select("id, tipo, categoria, quantidade, valor_centavos, data, motivo, criado_em, insumos(nome, unidade), marcas(nome), compras(numero)").order("criado_em", { ascending: false }).limit(40),
   ]);
   // Soma por insumo; o detalhe por marca aparece embaixo de cada um
   const s = new Map<string, { quantidade: number; valor_centavos: number }>();
@@ -117,7 +121,7 @@ async function Estoque() {
   }
   const porMarca = (insumoId: string) => (saldos ?? []).filter((x: any) => x.insumo_id === insumoId && Number(x.quantidade) !== 0);
   const valorTotal = (saldos ?? []).reduce((t, x) => t + Number(x.valor_centavos), 0);
-  const TIPO: Record<string, string> = { compra: "Compra", producao: "Produção", ajuste: "Ajuste", perda: "Perda", estorno: "Estorno" };
+  const TIPO: Record<string, string> = { compra: "Compra", producao: "Produção", ajuste: "Inventário", perda: "Perda", estorno: "Estorno" };
 
   return (
     <>
@@ -141,6 +145,17 @@ async function Estoque() {
                 const [rot, f] = POR[i.unidade];
                 const medio = q > 0 ? (v / q) * f : null;
                 const ref = i.preco_ref_centavos != null ? Number(i.preco_ref_centavos) * f : null;
+                if (!i.controla_estoque) {
+                  const ref = i.preco_ref_centavos != null ? Number(i.preco_ref_centavos) * f : null;
+                  return (
+                    <tr key={i.id}>
+                      <td><Link href={`/admin/insumos/${i.id}`} style={{ color: "inherit" }}>{i.nome}</Link> <span className="selo">da casa</span></td>
+                      <td className="dir suave">não controla</td>
+                      <td className="dir num">{ref != null ? <>{formatarBRL(Math.round(ref))}/{rot} <span className="suave">(padrão)</span></> : <span className="suave" style={{ color: "var(--erro)" }}>sem custo padrão</span>}</td>
+                      <td className="dir suave">—</td>
+                    </tr>
+                  );
+                }
                 const detalhe = porMarca(i.id);
                 const mostrarDetalhe = detalhe.length > 1 || detalhe.some((x: any) => x.marca_id);
                 return (
@@ -174,14 +189,14 @@ async function Estoque() {
 
       <div className="cartao">
         <h2>Ajuste ou perda</h2>
-        <p className="suave">Use para corrigir contagem (ajuste, positivo ou negativo) ou registrar perda. Fica valorizado pelo custo médio.</p>
+        <p className="suave">Perda (derramou, venceu, alguém usou) ou ajuste de inventário (a contagem deu diferente). Fica valorizado pelo custo médio da marca e aparece no fechamento do mês. Insumos da casa não entram aqui.</p>
         <FormAcao acao={registrarAjuste} botao="Registrar" limparAoSalvar>
           <div className="grade">
             <div className="campo">
               <label htmlFor="insumo_id">Insumo e marca</label>
               <select id="insumo_id" name="insumo_marca" required defaultValue="">
                 <option value="" disabled>Escolha…</option>
-                {(insumos ?? []).filter((i) => i.ativo).map((i: any) => (
+                {(insumos ?? []).filter((i) => i.ativo && i.controla_estoque).map((i: any) => (
                   <optgroup key={i.id} label={`${i.nome} (${i.unidade})`}>
                     {(i.marcas ?? []).filter((m: any) => m.ativo).map((m: any) => <option key={m.id} value={`${i.id}|${m.id}`}>{i.nome} · {m.nome}</option>)}
                     <option value={`${i.id}|`}>{i.nome} · sem marca</option>
@@ -191,7 +206,14 @@ async function Estoque() {
             </div>
             <div className="campo">
               <label htmlFor="tipo">Tipo</label>
-              <select id="tipo" name="tipo" defaultValue="perda"><option value="perda">Perda (reduz)</option><option value="ajuste">Ajuste de contagem (+ ou −)</option></select>
+              <select id="tipo" name="tipo" defaultValue="perda"><option value="perda">Perda (reduz)</option><option value="ajuste">Ajuste de inventário (+ ou −)</option></select>
+            </div>
+            <div className="campo">
+              <label htmlFor="categoria">Motivo da perda</label>
+              <select id="categoria" name="categoria" defaultValue="derramou">
+                {Object.entries(MOTIVOS_PERDA).map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+              </select>
+              <span className="ajuda">Só vale para perda.</span>
             </div>
             <div className="campo">
               <label htmlFor="quantidade">Quantidade (na unidade do insumo)</label>
@@ -202,7 +224,8 @@ async function Estoque() {
               <input id="data" name="data" type="date" defaultValue={hojeSP()} />
             </div>
           </div>
-          <div className="campo"><label htmlFor="motivo">Motivo</label><input id="motivo" name="motivo" required placeholder="Ex.: saco rasgado, contagem do mês" /></div>
+          <div className="campo"><label htmlFor="motivo">O que aconteceu</label><input id="motivo" name="motivo" placeholder="Ex.: pacote rasgou no armário; contagem do fim do mês" />
+            <span className="ajuda">Obrigatório para inventário e para “outro”.</span></div>
         </FormAcao>
       </div>
 
@@ -216,7 +239,7 @@ async function Estoque() {
                 {movs.map((m: any) => (
                   <tr key={m.id}>
                     <td className="num">{formatarData(m.data)}<div className="suave" style={{ fontSize: "0.78rem" }}>{formatarDataHora(m.criado_em)}</div></td>
-                    <td>{TIPO[m.tipo] ?? m.tipo}</td>
+                    <td>{TIPO[m.tipo] ?? m.tipo}{m.tipo === "perda" && m.categoria && <div className="suave" style={{ fontSize: "0.78rem" }}>{MOTIVOS_PERDA[m.categoria]}</div>}</td>
                     <td>{m.insumos?.nome}{m.marcas?.nome && <span className="suave"> · {m.marcas.nome}</span>}</td>
                     <td className="dir num">{Number(m.quantidade) > 0 ? "+" : ""}{qtd(Number(m.quantidade), m.insumos?.unidade)}</td>
                     <td className="dir num">{formatarBRL(Math.round(Number(m.valor_centavos)))}</td>
@@ -239,7 +262,7 @@ async function ListaDeCompras() {
       .select("id, pedido_itens(quantidade, receita_versoes(peso_bolinha_g, massa_base_g, receita_versao_ingredientes(insumo_id, quantidade)))")
       .in("status_producao", ["confirmado", "em_producao"]),
     supabase.from("configuracoes").select("semola_g_por_base, saco_vacuo_por_base, etiqueta_por_base, molho_g_por_base, sacola_por_pedido").single(),
-    supabase.from("insumos").select("id, nome, unidade, uso_auxiliar, entra_lista_compras, ativo").order("nome"),
+    supabase.from("insumos").select("id, nome, unidade, uso_auxiliar, entra_lista_compras, ativo, controla_estoque").order("nome"),
     supabase.from("estoque_saldos").select("insumo_id, quantidade, valor_centavos"),
     supabase.from("insumo_embalagens").select("id, insumo_id, nome, quantidade_base, marca_id, marcas(nome, em_uso)").eq("ativo", true),
     supabase.from("compra_itens")
@@ -283,7 +306,7 @@ async function ListaDeCompras() {
     })),
   }));
   const aux = Object.fromEntries(Object.entries(cfg ?? {}).map(([k, v]) => [k, Number(v)])) as any;
-  const { linhas, bases } = montarLista(ped, aux, insumos ?? [], Object.fromEntries([...totais].map(([k, t]) => [k, t.q])));
+  const { linhas, bases } = montarLista(ped, aux, (insumos ?? []).map((i: any) => i.controla_estoque ? i : { ...i, entra_lista_compras: false }), Object.fromEntries([...totais].map(([k, t]) => [k, t.q])));
   const comprar = linhas.filter((l) => l.comprar > 0);
 
   return (

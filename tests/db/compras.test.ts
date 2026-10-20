@@ -91,7 +91,7 @@ describe.skipIf(!HOST)("compras e estoque", () => {
 
   it("perda e ajuste exigem motivo e usam o custo médio", async () => {
     await expect(amb.como("admin", `select public.registrar_ajuste_estoque($1, -100, 'perda', '')`, [ins["Farinha"]]))
-      .rejects.toThrow(/motivo/);
+      .rejects.toThrow(/Descreva/);
     await amb.como("admin", `select public.registrar_ajuste_estoque($1, -400, 'perda', 'Saco rasgado')`, [ins["Farinha"]]);
     expect(await saldo("Farinha")).toEqual({ q: 3600, v: 8100 });
   });

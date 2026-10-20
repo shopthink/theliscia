@@ -4,6 +4,7 @@ const PAGAMENTO: Record<string, [string, string]> = {
   sinal_confirmado: ["Sinal confirmado", ""],
   integral_confirmado: ["Pago", "ok"],
   recusado: ["Recusado", "erro"],
+  cortesia: ["Brinde", "escuro"],
 };
 const PRODUCAO: Record<string, [string, string]> = {
   confirmado: ["Confirmado", ""],

@@ -18,7 +18,7 @@ export default async function Lote({ params, searchParams }: { params: Promise<{
       .select("*, receitas(nome, produz:insumos!receitas_produz_insumo_id_fkey(nome, unidade)), receita_versoes(numero), lote_sessoes(id, etapa, inicio, fim, manual), lote_esperas(id, tipo, inicio, fim, alvo_min, lembrete_min, lembrete_feito_em), lote_consumos(insumo_id, marca_id, quantidade_prevista, quantidade_real, custo_unitario_centavos, custo_total_centavos, insumos(nome, unidade), marcas(nome)), pedido_itens(id, quantidade, nome, pedidos(id, numero, cliente_nome, entrega_em))")
       .eq("id", id).maybeSingle(),
     supabase.from("lote_sessoes").select("lote_id, etapa, lotes(numero)").is("fim", null).neq("lote_id", id).maybeSingle(),
-    supabase.from("insumos").select("id, nome, unidade, marcas(id, nome, em_uso, ativo)").eq("ativo", true).order("nome"),
+    supabase.from("insumos").select("id, nome, unidade, controla_estoque, marcas(id, nome, em_uso, ativo)").eq("ativo", true).order("nome"),
     supabase.from("estoque_saldos").select("insumo_id, marca_id, quantidade"),
   ]);
   if (!l) notFound();

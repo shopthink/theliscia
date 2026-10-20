@@ -7,7 +7,7 @@ export const metadata = { title: "Nova compra" };
 export default async function NovaCompra() {
   const { supabase } = await exigirAdmin();
   const [{ data: insumos }, { data: fornecedores }, { data: cfg }] = await Promise.all([
-    supabase.from("insumos").select("id, nome, unidade, insumo_embalagens(id, nome, conteudo, unidade, marca_id, ativo), marcas(id, nome, em_uso, ativo)").eq("ativo", true).order("nome"),
+    supabase.from("insumos").select("id, nome, unidade, controla_estoque, insumo_embalagens(id, nome, conteudo, unidade, marca_id, ativo), marcas(id, nome, em_uso, ativo)").eq("ativo", true).order("nome"),
     supabase.from("fornecedores").select("id, nome").eq("ativo", true).order("nome"),
     supabase.from("configuracoes").select("valor_hora_centavos").single(),
   ]);

@@ -10,7 +10,7 @@ import { salvarCompra, type CompraForm } from "./actions";
 
 interface EmbalagemOpcao { id: string; nome: string; conteudo: number; unidade: string; marca_id?: string | null }
 interface MarcaOpcao { id: string; nome: string; em_uso: boolean; ativo?: boolean }
-interface Insumo { id: string; nome: string; unidade: string; embalagens?: EmbalagemOpcao[]; marcas?: MarcaOpcao[] }
+interface Insumo { id: string; nome: string; unidade: string; controla_estoque?: boolean; embalagens?: EmbalagemOpcao[]; marcas?: MarcaOpcao[] }
 interface Fornecedor { id: string; nome: string }
 
 interface Linha {
@@ -358,7 +358,8 @@ export function FormCompra({ insumos, fornecedores, valorHora, inicial }: {
               </div>
               <div className="acoes" style={{ justifyContent: "space-between", fontSize: "0.88rem" }}>
                 <span className="suave">
-                  {q ? <>Entra no estoque: <strong>{q.quantidade.toLocaleString("pt-BR")} {q.unidade}</strong></> : "Complete a embalagem para ver a quantidade"}
+                  {ins && ins.controla_estoque === false && <><span className="selo">da casa</span> não entra no estoque; o preço pago vira o custo padrão · </>}
+                  {q ? <>{ins?.controla_estoque === false ? "Quantidade" : "Entra no estoque"}: <strong>{q.quantidade.toLocaleString("pt-BR")} {q.unidade}</strong></> : "Complete a embalagem para ver a quantidade"}
                   {previa.finais && <> · custo final <strong>{formatarBRL(previa.finais[k])}</strong></>}
                   {unidadeRuim && <span style={{ color: "var(--erro)" }}> · unidade incompatível com o insumo</span>}
                 </span>

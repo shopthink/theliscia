@@ -26,7 +26,7 @@ export default async function Compra({ params, searchParams }: { params: Promise
 
   if (sp.editar && !c.cancelada) {
     const [{ data: insumos }, { data: fornecedores }] = await Promise.all([
-      supabase.from("insumos").select("id, nome, unidade, insumo_embalagens(id, nome, conteudo, unidade, marca_id, ativo), marcas(id, nome, em_uso, ativo)").order("nome"),
+      supabase.from("insumos").select("id, nome, unidade, controla_estoque, insumo_embalagens(id, nome, conteudo, unidade, marca_id, ativo), marcas(id, nome, em_uso, ativo)").order("nome"),
       supabase.from("fornecedores").select("id, nome").order("nome"),
     ]);
     return (

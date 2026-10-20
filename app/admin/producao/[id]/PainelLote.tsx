@@ -17,7 +17,7 @@ interface Lote {
 }
 interface Espera { id: string; tipo: string; inicio: string; fim: string | null; alvo_min: number; lembrete_min: number | null; lembrete_feito_em: string | null }
 interface Consumo { insumo_id: string; nome: string; unidade: string; marca_id: string | null; marca_nome: string | null; prevista: number; real: number; custoUnit: number | null; custoTotal: number | null }
-interface InsumoLote { id: string; nome: string; unidade: string; marcas?: { id: string; nome: string; em_uso: boolean }[] }
+interface InsumoLote { id: string; nome: string; unidade: string; controla_estoque?: boolean; marcas?: { id: string; nome: string; em_uso: boolean }[] }
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 
@@ -293,7 +293,9 @@ function Apontamento({ lote, consumos, insumos, estoque, editavel, agir, pendent
               {consumos.map((c) => (
                 <tr key={c.insumo_id}>
                   <td>{c.nome}</td>
-                  <td>{c.marca_nome ?? <span className="suave">sem marca</span>}</td>
+                  <td>{insumos.find((i) => i.id === c.insumo_id)?.controla_estoque === false
+                    ? <span className="suave">da casa (custo padrão)</span>
+                    : c.marca_nome ?? <span className="suave">sem marca</span>}</td>
                   <td className="dir num">{fmt(c.prevista)} {c.unidade}</td>
                   <td className="dir num">{fmt(c.real)} {c.unidade}</td>
                   <td className="dir num">{c.custoUnit != null ? (c.unidade === "un" ? formatarBRL(Math.round(c.custoUnit)) + "/un" : formatarBRL(Math.round(c.custoUnit * 1000)) + (c.unidade === "ml" ? "/L" : "/kg")) : "—"}</td>
@@ -334,7 +336,9 @@ function Apontamento({ lote, consumos, insumos, estoque, editavel, agir, pendent
                   <td className="dir num">{fmt(l.prevista)} {l.unidade}</td>
                   <td><input inputMode="decimal" aria-label={`Consumo real de ${l.nome}`} value={reais[l.insumo_id] ?? ""}
                     onChange={(e) => setReais((r) => ({ ...r, [l.insumo_id]: e.target.value }))} /></td>
-                  <td className="dir num" style={tem < real && l.nome !== "Água filtrada" ? { color: "var(--erro)" } : undefined}>{fmt(tem)} {l.unidade}</td>
+                  {insumos.find((i) => i.id === l.insumo_id)?.controla_estoque === false
+                    ? <td className="dir suave">da casa</td>
+                    : <td className="dir num" style={tem < real ? { color: "var(--erro)" } : undefined}>{fmt(tem)} {l.unidade}</td>}
                 </tr>
               );
             })}

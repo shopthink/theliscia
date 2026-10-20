@@ -12,6 +12,11 @@ function precoPorUnidadeBase(texto: string, unidade: string): number | null | "i
   return unidade === "un" ? c : c / 1000;
 }
 
+function erroInsumo(e: { code?: string; message?: string }) {
+  if (e.code === "23505" && e.message?.includes("uso_auxiliar")) return "Outro insumo já entra automaticamente com esse uso. Troque lá primeiro.";
+  return mensagemDoBanco(e);
+}
+
 export async function salvarInsumo(_: EstadoForm, d: FormData): Promise<EstadoForm> {
   const { supabase } = await exigirAdmin();
   const id = String(d.get("id") ?? "");
@@ -19,6 +24,8 @@ export async function salvarInsumo(_: EstadoForm, d: FormData): Promise<EstadoFo
   const unidade = String(d.get("unidade") ?? "");
   if (!nome) return { erro: "Informe o nome." };
   if (!["g", "ml", "un"].includes(unidade)) return { erro: "Unidade inválida." };
+  const uso = String(d.get("uso_auxiliar") ?? "");
+  if (uso && !["semola", "saco_vacuo", "etiqueta", "molho", "sacola"].includes(uso)) return { erro: "Uso automático inválido." };
   const preco = precoPorUnidadeBase(String(d.get("preco") ?? ""), unidade);
   if (preco === "invalido") return { erro: "Preço inválido. Use, por exemplo, 6,50." };
   const linha = {
@@ -27,18 +34,20 @@ export async function salvarInsumo(_: EstadoForm, d: FormData): Promise<EstadoFo
     categoria: String(d.get("categoria") ?? "ingrediente"),
     preco_ref_centavos: preco,
     entra_lista_compras: d.get("entra_lista_compras") === "on",
+    controla_estoque: d.get("controla_estoque") === "on",
+    uso_auxiliar: String(d.get("uso_auxiliar") ?? "") || null,
     observacoes: String(d.get("observacoes") ?? "").trim() || null,
     ativo: id ? d.get("ativo") === "on" : true,
   };
   if (id) {
     const { data, error } = await supabase.from("insumos").update(linha).eq("id", id).eq("versao", Number(d.get("versao"))).select("id");
-    if (error) return { erro: mensagemDoBanco(error) };
+    if (error) return { erro: erroInsumo(error) };
     if (!data?.length) return { erro: CONFLITO };
   } else {
     const { error } = await supabase.from("insumos").insert(linha);
-    if (error) return { erro: mensagemDoBanco(error) };
+    if (error) return { erro: erroInsumo(error) };
   }
-  revalidatePath("/admin/insumos");
+  revalidatePath("/admin/insumos", "layout");
   return { ok: id ? "Insumo salvo." : "Insumo cadastrado." };
 }
 

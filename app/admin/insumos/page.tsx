@@ -21,7 +21,7 @@ export default async function Insumos() {
         <div>
           <h1>Insumos</h1>
           <p className="suave" style={{ margin: 0 }}>
-            Cada insumo é o ingrediente genérico da receita. As marcas que você compra, com tabela nutricional, embalagens, preço pago e perdas, ficam dentro de cada um.
+            Insumo “da casa” (sem controle de estoque) entra no custo dos lotes pelo custo padrão e não mexe em estoque. Cada insumo é o ingrediente genérico da receita. As marcas que você compra, com tabela nutricional, embalagens, preço pago e perdas, ficam dentro de cada um.
           </p>
         </div>
       </div>
@@ -35,6 +35,7 @@ export default async function Insumos() {
           </FormAcao>
           <div className="acoes" style={{ justifyContent: "space-between", borderTop: "1px solid var(--creme-2)", marginTop: "0.6rem", paddingTop: "0.7rem" }}>
             <span className="suave" style={{ fontSize: "0.9rem" }}>
+              {!i.controla_estoque && <><span className="selo">da casa</span>{" "}</>}
               {(i.marcas ?? []).filter((m: any) => m.ativo).length
                 ? <>Marcas: {(i.marcas ?? []).filter((m: any) => m.ativo).map((m: any) => m.em_uso ? `${m.nome} (em uso)` : m.nome).join(", ")}</>
                 : "Nenhuma marca cadastrada"}
@@ -47,7 +48,7 @@ export default async function Insumos() {
       <div className="cartao">
         <h2>Novo insumo</h2>
         <FormAcao acao={salvarInsumo} botao="Cadastrar" limparAoSalvar>
-          <Campos i={{ categoria: "ingrediente", entra_lista_compras: true }} novo />
+          <Campos i={{ categoria: "ingrediente", entra_lista_compras: true, controla_estoque: true }} novo />
         </FormAcao>
       </div>
     </>
@@ -78,14 +79,28 @@ function Campos({ i, novo }: { i: any; novo?: boolean }) {
         </select>
       </div>
       <div className="campo">
-        <label htmlFor={`p-${s}`}>Preço de referência (R$ {novo ? "por kg, litro ou unidade" : POR[i.unidade]})</label>
-        <input id={`p-${s}`} name="preco" inputMode="decimal" defaultValue={precoExibido(i.preco_ref_centavos, i.unidade)} placeholder="sem estimativa" />
+        <label htmlFor={`p-${s}`}>Custo padrão (R$ {novo ? "por kg, litro ou unidade" : POR[i.unidade]})</label>
+        <input id={`p-${s}`} name="preco" inputMode="decimal" defaultValue={precoExibido(i.preco_ref_centavos, i.unidade)} placeholder="sem custo" />
+        <span className="ajuda">Usado no custo dos lotes quando o insumo é da casa ou ainda não tem compra.</span>
+      </div>
+      <div className="campo">
+        <label htmlFor={`a-${s}`}>Entra sozinho em cada lote como</label>
+        <select id={`a-${s}`} name="uso_auxiliar" defaultValue={i.uso_auxiliar ?? ""}>
+          <option value="">Não (só pela receita)</option>
+          <option value="semola">Sêmola de abertura (por base)</option>
+          <option value="saco_vacuo">Saco a vácuo (por base)</option>
+          <option value="etiqueta">Etiqueta (por base)</option>
+          <option value="molho">Molho de marcação (por base)</option>
+          <option value="sacola">Sacola (por pedido)</option>
+        </select>
+        <span className="ajuda">As quantidades ficam em Configurações.</span>
       </div>
       <div className="campo" style={{ gridColumn: "1 / -1" }}>
         <label htmlFor={`o-${s}`}>Observações</label>
         <input id={`o-${s}`} name="observacoes" defaultValue={i.observacoes ?? ""} />
       </div>
       <div className="acoes" style={{ gridColumn: "1 / -1", marginBottom: "0.75rem" }}>
+        <label className="check" title="Desligado: insumo da casa. Entra no custo pelo custo padrão, sem estoque."><input type="checkbox" name="controla_estoque" defaultChecked={i.controla_estoque ?? true} /> Controla estoque</label>
         <label className="check"><input type="checkbox" name="entra_lista_compras" defaultChecked={i.entra_lista_compras} /> Entra na lista de compras</label>
         {!novo && <label className="check"><input type="checkbox" name="ativo" defaultChecked={i.ativo} /> Ativo</label>}
       </div>

@@ -6,6 +6,7 @@ import { formatarBRL } from "@/lib/dinheiro";
 import { precoPorEmbalagemBase } from "@/lib/marcas";
 import { FormAcao } from "@/components/FormAcao";
 import { Embalagens, FormNutricao } from "../Componentes";
+import { GraficoCusto, variacao, type PontoCusto } from "@/components/GraficoCusto";
 import { salvarMarca, usarMarca } from "../actions";
 
 export const metadata = { title: "Insumo" };
@@ -19,12 +20,14 @@ const fmtQtd = (q: number, un: string) =>
 export default async function Insumo({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase } = await exigirAdmin();
-  const [{ data: i }, { data: marcas }, { data: resumo }, { data: saldos }, { data: embalagens }] = await Promise.all([
+  const [{ data: i }, { data: marcas }, { data: resumo }, { data: saldos }, { data: embalagens }, { data: compras }, { data: padroes }] = await Promise.all([
     supabase.from("insumos").select("*").eq("id", id).maybeSingle(),
     supabase.from("marcas").select("*").eq("insumo_id", id).order("em_uso", { ascending: false }).order("ativo", { ascending: false }).order("nome"),
     supabase.from("marcas_resumo").select("*").eq("insumo_id", id),
     supabase.from("estoque_saldos").select("marca_id, quantidade, valor_centavos").eq("insumo_id", id),
     supabase.from("insumo_embalagens").select("id, nome, conteudo, marca_id").eq("insumo_id", id).eq("ativo", true),
+    supabase.from("compra_itens").select("quantidade_base, custo_final_centavos, marcas(nome), compras!inner(data, cancelada, fornecedores(nome))").eq("insumo_id", id).eq("compras.cancelada", false),
+    supabase.from("insumo_custos_padrao").select("custo_centavos, desde").eq("insumo_id", id).order("desde"),
   ]);
   if (!i) notFound();
   const res = new Map((resumo ?? []).map((r: any) => [r.id, r]));
@@ -33,6 +36,15 @@ export default async function Insumo({ params }: { params: Promise<{ id: string 
   const totalValor = (saldos ?? []).reduce((s, x) => s + Number(x.valor_centavos), 0);
   const ingrediente = i.categoria !== "embalagem";
   const lista = (marcas ?? []) as any[];
+  const fator = i.unidade === "un" ? 1 : 1000;
+  const porUn = i.unidade === "g" ? "kg" : i.unidade === "ml" ? "L" : "un";
+  const pontosCompra: PontoCusto[] = ((compras ?? []) as any[])
+    .map((c) => ({ data: c.compras.data, valor: (Number(c.custo_final_centavos) / Number(c.quantidade_base)) * fator / 100,
+      detalhe: [c.marcas?.nome, c.compras.fornecedores?.nome].filter(Boolean).join(" · ") }))
+    .sort((a, b) => a.data.localeCompare(b.data));
+  const pontosPadrao: PontoCusto[] = (padroes ?? []).map((p) => ({ data: p.desde, valor: Number(p.custo_centavos) * fator / 100, detalhe: "custo padrão" }));
+  const pontos = pontosCompra.length && i.controla_estoque ? pontosCompra : pontosPadrao;
+  const varPct = variacao(pontos);
   const comparaveis = lista.filter((m) => m.ativo || Number(res.get(m.id)?.estoque ?? 0) !== 0);
 
   return (
@@ -45,7 +57,25 @@ export default async function Insumo({ params }: { params: Promise<{ id: string 
         </div>
       </div>
 
-      <div className="cartoes">
+      {!i.controla_estoque && (
+        <div className="aviso info">
+          <strong>Insumo da casa:</strong> não controla estoque. Entra no custo dos lotes pelo custo padrão
+          ({i.preco_ref_centavos != null ? precoPorEmbalagemBase(Number(i.preco_ref_centavos), i.unidade) : "sem custo padrão: informe em Insumos"}).
+          Ao lançar uma compra dele, o preço pago vira o novo custo padrão. Quando tiver um só para a pizzaria, ligue “Controla estoque” em Insumos.
+        </div>
+      )}
+      <div className="cartao">
+        <div className="acoes" style={{ justifyContent: "space-between" }}>
+          <h2 style={{ margin: 0 }}>Evolução do custo (R$/{porUn})</h2>
+          {varPct != null && <span className={varPct > 0 ? "variacao-sobe" : varPct < 0 ? "variacao-desce" : "suave"}>
+            {varPct > 0 ? "▲" : varPct < 0 ? "▼" : "="} {Math.abs(varPct).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% desde {formatarData(pontos[0].data)}
+          </span>}
+        </div>
+        <p className="suave" style={{ fontSize: "0.85rem", marginTop: "0.3rem" }}>{pontosCompra.length && i.controla_estoque ? "Cada ponto é uma compra (preço pago com frete rateado). Passe o mouse para ver marca e fornecedor." : "Histórico do custo padrão."}</p>
+        <GraficoCusto pontos={pontos} unidade={porUn} largura={1000} rotulo={`Custo de ${i.nome}`} />
+      </div>
+
+      {i.controla_estoque && <div className="cartoes">
         <div className="cartao"><div className="caixa-alta suave">Estoque total</div><div className="indicador num">{fmtQtd(totalQtd, i.unidade)}</div>
           <small>{totalQtd > 0 ? `custo médio ${precoPorEmbalagemBase(totalValor / totalQtd, i.unidade)}` : "sem estoque"}</small></div>
         <div className="cartao"><div className="caixa-alta suave">Marca em uso</div><div className="indicador">{lista.find((m) => m.em_uso)?.nome ?? "—"}</div>
@@ -54,7 +84,7 @@ export default async function Insumo({ params }: { params: Promise<{ id: string 
           <div className="cartao"><div className="caixa-alta suave">Sem marca</div><div className="indicador num">{fmtQtd(Number(semMarca.quantidade), i.unidade)}</div>
             <small>Compras antigas ou sem marca informada</small></div>
         )}
-      </div>
+      </div>}
 
       <div className="cartao">
         <h2>Comparativo de marcas</h2>
